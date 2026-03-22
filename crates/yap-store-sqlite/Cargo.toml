@@ -1,0 +1,30 @@
+[package]
+name = "yap-store-sqlite"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+yap-core = { path = "../yap-core" }
+tokio.workspace = true
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "chrono"] }
+uuid.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+tracing.workspace = true
+fractional_index.workspace = true
+async-trait = "0.1"
+sha2 = "0.10"
+hex = "0.4"
+
+[dev-dependencies]
+tokio-test.workspace = true
+tokio = { workspace = true, features = ["full"] }
+yap-core = { path = "../yap-core" }
+serde_json.workspace = true
+uuid.workspace = true

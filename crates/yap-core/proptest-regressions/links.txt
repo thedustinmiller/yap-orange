@@ -1,0 +1,15 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc 096efdb1f1094b88e3269908dcfcefb06fec6a62b655c4416f74bbe2cbfaac86 # shrinks to segs1 = ["a"], segs2 = [":"]
+cc a2495279c94e32d7911c85f19bc8a8f65821091b28bb3cfa370a48dada07f067 # shrinks to segs = [":"]
+cc d1845812d1f0d4ac6db50bda139670b27519524e95f108511b53ad743a1f09a8 # shrinks to (content, _expected_segs) = ("[[:]]", [[":"]])
+cc 830132f65fb827e7326c0eb8dee67bc039a26fe644ba7860adec617936a175ca # shrinks to prefix = "", segs = [":"], suffix = ""
+cc 305eab77f467f7b008b86fcf0c5ec13ef8fac67d360bda1d7bc3644a28478507 # shrinks to prefix_chars = ['à'], segs = [":"]
+cc 47708e4400761d12bbd7a80323b839f2f8f4230e81eed57be21de445ff18cafb # shrinks to segs = ["."]
+cc fc971059574833812462ca69be21fe750b4920830f26b9397437874193202a6d # shrinks to prefix_chars = ['à'], segs = ["."]
+cc 4e58e896f432063a6bf00b03e5babbf347949645eb55ccca4638f7cd564abcc7 # shrinks to prefix = "", segs = ["."], suffix = ""
+cc fbc84bf1d9622331ab35945ce7c4809afa3c2c19148676b5f96c0d30877d4a90 # shrinks to segs1 = ["A"], segs2 = ["."]

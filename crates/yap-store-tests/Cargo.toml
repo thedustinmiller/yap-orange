@@ -1,0 +1,19 @@
+[package]
+name = "yap-store-tests"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+yap-core = { path = "../yap-core" }
+yap-store-pg = { path = "../yap-store-pg" }
+yap-store-sqlite = { path = "../yap-store-sqlite" }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "postgres"] }
+tokio = { workspace = true, features = ["full"] }
+uuid.workspace = true
+serde_json.workspace = true
+paste = "1"

@@ -1,0 +1,159 @@
+{
+  "format": "yap-tree-v1",
+  "exported_at": "2026-03-05T02:57:46.188978253Z",
+  "source_namespace": "sample",
+  "nodes": [
+    {
+      "local_id": 0,
+      "name": "sample",
+      "content_type": "content",
+      "content_template": "",
+      "internal_links": [],
+      "external_links": [],
+      "properties": {},
+      "export_hash": "e6e111dde8396b9274803c1c022c1f523b8806bbc91d7a81e9b7596661ef3fda",
+      "parent_local_id": null,
+      "position": "8680",
+      "children_local_ids": [
+        1
+      ]
+    },
+    {
+      "local_id": 1,
+      "name": "recipes",
+      "content_type": "content",
+      "content_template": "",
+      "internal_links": [],
+      "external_links": [],
+      "properties": {},
+      "export_hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "parent_local_id": 0,
+      "position": "80",
+      "children_local_ids": [
+        2,
+        3
+      ]
+    },
+    {
+      "local_id": 2,
+      "name": "soups",
+      "content_type": "content",
+      "content_template": "",
+      "internal_links": [],
+      "external_links": [],
+      "properties": {},
+      "export_hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "parent_local_id": 1,
+      "position": "80",
+      "children_local_ids": [
+        4,
+        5,
+        6
+      ]
+    },
+    {
+      "local_id": 3,
+      "name": "pasta",
+      "content_type": "content",
+      "content_template": "",
+      "internal_links": [],
+      "external_links": [],
+      "properties": {},
+      "export_hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "parent_local_id": 1,
+      "position": "8180",
+      "children_local_ids": [
+        7,
+        8
+      ]
+    },
+    {
+      "local_id": 4,
+      "name": "broth",
+      "content_type": "content",
+      "content_template": "A rich vegetable broth base. Works in any soup.",
+      "internal_links": [],
+      "external_links": [],
+      "properties": {},
+      "export_hash": "9e6951be0661f6f45841d87aa570247d78625455a91a3a77cb46ee179e5cf43c",
+      "parent_local_id": 2,
+      "position": "80",
+      "children_local_ids": []
+    },
+    {
+      "local_id": 5,
+      "name": "minestrone",
+      "content_type": "content",
+      "content_template": "Classic Italian minestrone. Starts with {0}.",
+      "internal_links": [
+        {
+          "placeholder_index": 0,
+          "target_local_id": 4
+        }
+      ],
+      "external_links": [],
+      "properties": {},
+      "export_hash": "f7a336d58b47eb4b0862fce02db1469068071eeb24c5a0b0567bd599f1c33049",
+      "parent_local_id": 2,
+      "position": "8180",
+      "children_local_ids": []
+    },
+    {
+      "local_id": 6,
+      "name": "tomato-soup",
+      "content_type": "content",
+      "content_template": "Simple tomato soup. Uses {0} as the base.",
+      "internal_links": [
+        {
+          "placeholder_index": 0,
+          "target_local_id": 4
+        }
+      ],
+      "external_links": [],
+      "properties": {},
+      "export_hash": "46fcd32878e8ec8d1be0ac6a8276bacfa8a07e965f59e02db08cbdf6b48d0899",
+      "parent_local_id": 2,
+      "position": "8280",
+      "children_local_ids": []
+    },
+    {
+      "local_id": 7,
+      "name": "aglio-e-olio",
+      "content_type": "content",
+      "content_template": "Al dente pasta with olive oil, garlic, and parmesan.",
+      "internal_links": [],
+      "external_links": [],
+      "properties": {},
+      "export_hash": "f94ac65f128030af2d992d5226a6391e736241ca4de49634637a82c9d77fe4ca",
+      "parent_local_id": 3,
+      "position": "80",
+      "children_local_ids": []
+    },
+    {
+      "local_id": 8,
+      "name": "pasta-e-fagioli",
+      "content_type": "content",
+      "content_template": "Pasta with {0}-based sauce and vegetables.",
+      "internal_links": [
+        {
+          "placeholder_index": 0,
+          "target_local_id": 4
+        }
+      ],
+      "external_links": [],
+      "properties": {},
+      "export_hash": "41b448ebd2bc03546b0a2c085b706374a16b12fd18135471c5b0408647704494",
+      "parent_local_id": 3,
+      "position": "8180",
+      "children_local_ids": []
+    }
+  ],
+  "edges": [
+    {
+      "from_local_id": 8,
+      "to_local_id": 5,
+      "edge_type": "inspired-by",
+      "properties": {}
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+[package]
+name = "xtask"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+yap-core = { path = "../crates/yap-core" }
+yap-store-pg = { path = "../crates/yap-store-pg" }
+tokio.workspace = true
+sqlx.workspace = true
+uuid.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+clap.workspace = true
+anyhow.workspace = true
+rand = "0.9"

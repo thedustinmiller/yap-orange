@@ -1,0 +1,74 @@
+{
+  "format": "yap-tree-v1",
+  "exported_at": "2026-03-05T02:58:05.321743085Z",
+  "source_namespace": "sample::recipes::soups",
+  "nodes": [
+    {
+      "local_id": 0,
+      "name": "soups",
+      "content_type": "content",
+      "content_template": "",
+      "internal_links": [],
+      "external_links": [],
+      "properties": {},
+      "export_hash": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7",
+      "parent_local_id": null,
+      "position": "80",
+      "children_local_ids": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "local_id": 1,
+      "name": "broth",
+      "content_type": "content",
+      "content_template": "A rich vegetable broth base. Works in any soup.",
+      "internal_links": [],
+      "external_links": [],
+      "properties": {},
+      "export_hash": "9e6951be0661f6f45841d87aa570247d78625455a91a3a77cb46ee179e5cf43c",
+      "parent_local_id": 0,
+      "position": "80",
+      "children_local_ids": []
+    },
+    {
+      "local_id": 2,
+      "name": "minestrone",
+      "content_type": "content",
+      "content_template": "Classic Italian minestrone. Starts with {0}.",
+      "internal_links": [
+        {
+          "placeholder_index": 0,
+          "target_local_id": 1
+        }
+      ],
+      "external_links": [],
+      "properties": {},
+      "export_hash": "32937caf570f7ac6fb1c0a93514228ff6f62d7eb9b7e4f3fbb39b9042e6bb8c8",
+      "parent_local_id": 0,
+      "position": "8180",
+      "children_local_ids": []
+    },
+    {
+      "local_id": 3,
+      "name": "tomato-soup",
+      "content_type": "content",
+      "content_template": "Simple tomato soup. Uses {0} as the base.",
+      "internal_links": [
+        {
+          "placeholder_index": 0,
+          "target_local_id": 1
+        }
+      ],
+      "external_links": [],
+      "properties": {},
+      "export_hash": "116070a7020b4522a089b60c0e96e85d182bafdc73946d829a8b8e8ea8e9eca9",
+      "parent_local_id": 0,
+      "position": "8280",
+      "children_local_ids": []
+    }
+  ],
+  "edges": []
+}

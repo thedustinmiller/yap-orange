@@ -1,0 +1,53 @@
+[package]
+name = "yap-server"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = ["postgres", "openapi", "http-layers", "tokio", "server", "bench"]
+postgres = ["yap-store-pg"]
+sqlite = ["yap-store-sqlite"]
+openapi = ["dep:utoipa", "dep:utoipa-swagger-ui", "yap-core/openapi"]
+http-layers = ["dep:tower-http"]
+# "server" enables the tokio/hyper runtime features needed for standalone HTTP server.
+# Without it, only the Router (as a Tower Service) is available — used by WASM.
+server = ["axum/tokio", "axum/http1", "axum/http2"]
+tokio = ["dep:tokio"]
+bench = ["dep:yap-bench"]
+
+[dependencies]
+yap-core = { path = "../yap-core", default-features = false }
+yap-store-pg = { path = "../yap-store-pg", optional = true }
+yap-store-sqlite = { path = "../yap-store-sqlite", optional = true }
+yap-bench = { path = "../yap-bench", optional = true }
+tokio = { workspace = true, optional = true }
+axum = { version = "0.8", default-features = false, features = ["json", "query"] }
+tower = { version = "0.5", default-features = false }
+tower-http = { workspace = true, optional = true }
+uuid.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+utoipa = { workspace = true, optional = true }
+utoipa-swagger-ui = { workspace = true, optional = true }
+
+[dev-dependencies]
+tokio-test.workspace = true
+tokio = { workspace = true, features = ["full"] }
+tower = { version = "0.5", features = ["util"] }
+serde_json.workspace = true
+uuid.workspace = true
+http = "1"
+http-body-util = "0.1"
+yap-store-sqlite = { path = "../yap-store-sqlite" }
+yap-core = { path = "../yap-core" }
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }

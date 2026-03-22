@@ -1,0 +1,99 @@
+/* === Color System (Tokyo Night) === */
+:root {
+  --bg-primary: #1a1b26;
+  --bg-secondary: #16171f;
+  --bg-tertiary: #24253a;
+  --bg-hover: rgba(255, 255, 255, 0.04);
+  --bg-active: rgba(122, 162, 247, 0.12);
+  --bg-selected: rgba(122, 162, 247, 0.08);
+  --bg-selected-hover: rgba(122, 162, 247, 0.14);
+  --bg-editing: rgba(122, 162, 247, 0.05);
+  --bg-input: #1e1f2e;
+
+  --text-primary: #c0caf5;
+  --text-secondary: #a9b1d6;
+  --text-muted: #7a85b8;
+
+  --border-color: #292e42;
+
+  --accent-color: #7aa2f7;
+  --accent-bright: #89b4fa;
+  --accent-glow: rgba(122, 162, 247, 0.2);
+
+  --link-color: #7dcfff;
+  --edge-color: #bb9af7;
+
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+
+  color-scheme: dark;
+}
+
+/* === Reset & Base === */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* === Scrollbar Styling === */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* === Dockview overrides === */
+/* Extra .dock-layout ancestor for specificity over dockview v5 runtime CSS */
+.dock-layout .dockview-theme-dark .dv-tabs-container {
+  font-size: 12px;
+}
+
+.dock-layout .dockview-theme-dark .dv-default-tab {
+  font-size: 11px;
+  padding: 4px 12px;
+}
+
+/* Make the SvelteFlow graph background match our theme */
+.svelte-flow {
+  --xy-background-color: var(--bg-primary) !important;
+}
+
+.svelte-flow .svelte-flow__edge-text {
+  font-size: 9px;
+}

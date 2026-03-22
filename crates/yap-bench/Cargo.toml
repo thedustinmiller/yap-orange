@@ -1,0 +1,17 @@
+[package]
+name = "yap-bench"
+version.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+yap-core = { path = "../yap-core", default-features = false }
+async-trait = "0.1"
+uuid.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+rand = { version = "0.9", default-features = false, features = ["std_rng", "alloc"] }
+web-time = "1"

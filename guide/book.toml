@@ -1,0 +1,10 @@
+[book]
+authors = ["Dustin Sallings"]
+language = "en"
+src = "src"
+title = "yap-orange User Guide"
+
+[output.html]
+default-theme = "navy"
+preferred-dark-theme = "navy"
+git-repository-url = "https://git.rcr.pub/dustin/yap-orange"

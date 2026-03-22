@@ -1,0 +1,33 @@
+{
+  "productName": "Yap Orange",
+  "version": "0.1.0",
+  "identifier": "com.yap-orange.desktop",
+  "build": {
+    "frontendDist": "../../web/dist",
+    "devUrl": "http://localhost:5173",
+    "beforeDevCommand": "cd ../web && npm run dev",
+    "beforeBuildCommand": "cd ../web && npm run build"
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/icon.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png"
+    ]
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Yap Orange",
+        "width": 1200,
+        "height": 800
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self' data: blob:; connect-src 'self' http://localhost:* ws://localhost:*; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
+    }
+  }
+}
