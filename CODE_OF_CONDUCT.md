@@ -42,6 +42,9 @@ We agree to restrict the following behaviors in our community. Instances, threat
 3. **Promotional materials**. Sharing marketing or other commercial content in a way that is outside the norms of the community.
 4. **Irresponsible communication.** Failing to responsibly present content which includes, links or describes any other restricted behaviors.
 
+## Reporting and Enforcement
+
+This project is currently one person, so necessarily reports and enforcement go to the repository owner, thedustinmiller https://github.com/thedustinmiller.
 
 ## Scope
 

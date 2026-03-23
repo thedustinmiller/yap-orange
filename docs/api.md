@@ -1,12 +1,10 @@
 # HTTP API Reference
+Last updated 2026-03-22
 
-Base URL: `http://localhost:3000`
+This document maps the API surface and analogies between clients.
 
-All request bodies are JSON (`Content-Type: application/json`). All responses are JSON. Errors return `{"error": "message"}`.
 
 ## Client Parity
-
-The table below maps every server endpoint to its CLI command and `api.ts` web client function.
 
 | Endpoint | CLI Command | Web (`api.ts`) | Status |
 |---|---|---|---|
@@ -44,16 +42,6 @@ The table below maps every server endpoint to its CLI command and `api.ts` web c
 | `GET /api/debug/logs` | `yap debug logs` | `debug.logs(since)` | All |
 | `POST /api/debug/benchmarks` | `yap debug benchmarks` | — | CLI + API |
 
-### Notes
-
-- **`yap block tree`** is CLI-only — the web UI uses the Outliner component for tree rendering.
-- **`yap ns create/list/tree`** map to generic block endpoints (`POST /api/blocks`, `GET /api/blocks/roots`, `GET /api/blocks`), not dedicated namespace endpoints.
-- **`yap schema get`** filters client-side from `GET /api/schemas` (no dedicated server endpoint).
-- **`GET /api/blocks/:id/children`** is not exposed in the CLI — the CLI uses `block list --namespace` for similar queries.
-- **`POST /api/blocks/:id/restore-recursive`** is not in `api.ts` — the web UI doesn't expose bulk restore.
-- **`GET /api/atoms/:id/edges`** is not in `api.ts` — the web uses `atoms.graph()` which includes edges.
-- **`yap debug logs`** is one-shot; the web `debug.logs()` polls continuously via `DebugLog.svelte`.
-- **`POST /api/debug/benchmarks`** requires `--features bench` at compile time; server without it returns 404.
 
 ---
 

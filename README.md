@@ -1,5 +1,4 @@
 # yap-orange
-Written by: dustin@3studios.com
 
 A notetaking and knowledge store tool.
 
@@ -110,7 +109,7 @@ Don't want to memorize the syntax for a bunch of different platforms and clients
 
 
 ## AI
-This project up to 0.1.0 is almost 100% AI generated, by lines of code at least. In general, I will be explicit when something is written by me versus AI, and as I rewrite the docs I'll sign off what I write versus AI, as a matter of respect for any users, readers, or potential contributors. I tend to take the perspective that AI is a tool and the person must take responsibility for the product. Hence all commits are signed as me, personally, not an agent.
+This project up to 0.1.0 is almost 100% AI generated, by lines of code at least. I tend to take the perspective that AI is a tool and the person must take responsibility for the product. Hence all commits are signed as me, personally, not an agent.
 
 As for policy, be forthcoming about what's AI; otherwise quality of the material is paramount. If English isn't your preferred language, please feel free to write comments/issues/whatever in whichever language you're most comfortable with. I suspect machine translation will preserve more meaning and nuance while being less effort for everyone.
 
@@ -139,3 +138,4 @@ fixtures/           # Stored exports, used for testing and default configs
 - [docs/testing.md](./docs/testing.md) - testing practices and guide
 - [CONTRIBUTING.md](./CONTRIBUTING.md) - Contributing guide; thanks for your interest! :)
 - [QUICKSTART.md](./QUICKSTART.md) - getting started quick, cheat sheets 
+

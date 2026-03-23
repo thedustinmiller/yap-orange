@@ -2,9 +2,9 @@
 
 ## Overview
 
-yap-orange uses a four-table database model inspired by filesystem inodes. The key insight is separating *content* from *position*: notes can appear in multiple places, and links target stable identity objects rather than mutable paths.
+yap-orange currently uses a shared mental model between its stores and borrows heavily from *nix inodes, content addressible storage, and immutable/append only approaches. The combination lets us separate a few concepts that get conflated, namely content, topology, and linking. You can hard link, reference, deduplicate, and other behaviors that sound familiar for filesystems.
 
-There are three deployment modes:
+There are currently three deployment modalities
 
 ### Web / development mode
 
@@ -44,7 +44,7 @@ There are three deployment modes:
 └─────────────────────────────────────────┘
 ```
 
-The desktop build is a single binary with no external dependencies. On first launch pg-embed downloads the PostgreSQL binary (~50 MB) and caches it in `~/.cache/pg-embed/`. Database files are kept in the platform data directory (`~/.local/share/yap-orange` on Linux, `~/Library/Application Support/yap-orange` on macOS).
+The desktop build is a single binary, no dependencies to worry about. To run it uses pg-embed to download the PostgreSQL binary and caches it in the XDG cache. Database files live in the XDG locations (`~/.local/share/yap-orange` on Linux, `~/Library/Application Support/yap-orange` on macOS).
 
 ### Browser SPA mode (WASM)
 
@@ -61,21 +61,9 @@ The desktop build is a single binary with no external dependencies. On first lau
 │     OPFS persistence (sahpool VFS)      │
 └─────────────────────────────────────────┘
 ```
+This is a fun trick. Originally the idea was to just use pglite, but as of writing deploying that within a Rust WASM build is still cooking. So, we use a Dedicated Web Worker to run a wrapped version of the normal yap-server built to WASM, use sqlite-wasm-rs and sqlite-wasm-vfs for persistent storage, and due to the Store trait abstraction it 'just works'. Performance isn't identical, but so far is deep in good enough territory.
 
-The SPA build runs the entire API server inside the browser. The Axum router, request handlers, and SQLite database all compile to WebAssembly and run inside a Dedicated Web Worker. Browser storage uses the Origin Private File System (OPFS) via the `sahpool` VFS, giving persistent SQLite storage that survives page reloads. No backend server, Docker, or external database is needed.
 
-**How it works:**
-
-- `initWasmWorker()` in `sw-register.ts` checks if a backend server is available (`GET /health` with 1s timeout). If not, it spawns a Dedicated Worker (`wasm-worker.js`).
-- The worker loads `yap_server_wasm.wasm`, installs the OPFS VFS, opens SQLite, runs migrations, bootstraps meta-schema and settings, and builds the Axum router.
-- `api.ts` checks `isWasmMode()` — if true, requests are sent via `postMessage` to the worker instead of HTTP `fetch()`. The worker routes them through the Axum router and returns `{status, headers, body}` JSON.
-- Static assets are still served by the web server (Vite dev or any static host).
-
-**Key constraint:** `createSyncAccessHandle` (needed by OPFS sahpool VFS) is only available in Dedicated Web Workers — not Service Workers or the main thread. This is why the WASM engine runs in a Worker, not directly in the page.
-
-**Limitations:** Single-tab only (sahpool VFS supports one connection). Multi-tab would require SharedWorker (future work). Data lives in OPFS — not accessible from other origins.
-
-The CLI (`yap`) talks to the server over HTTP, not directly to the database. All business logic lives in `yap-core`, shared between server and CLI.
 
 ---
 
@@ -83,14 +71,14 @@ The CLI (`yap`) talks to the server over HTTP, not directly to the database. All
 
 ### Four Tables
 
-```
-atoms ──── immutable content snapshots (append-only)
-lineages ── mutable pointer to current atom snapshot
-blocks ──── hierarchy entries (directory-entry-like)
-edges ────  non-hierarchical relationships
+
+- atoms: immutable content snapshots (append-only)
+- lineages: mutable pointer to the most recent atom
+- blocks: hierarchy structure
+- edges: non-hierarchical relationships
 ```
 
-### Atoms — Immutable Content Snapshots
+### Atoms 
 
 ```sql
 CREATE TABLE atoms (
@@ -104,23 +92,12 @@ CREATE TABLE atoms (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
+Atoms are immutable, append only. 'Editing' creates a new atom on submission and the lineage updates to point at the new atom. You can go back through edit histories by traversing the predecessor chain.
 
-Atoms are **append-only**. Each edit creates a new atom row with `predecessor_id` pointing to the previous version. You never update or delete an atom row. This gives you:
+The content template system separates literal text from 'I'm referring to this content'. The client extracts wikilink formatted text and replaces it with placeholders, eg `{0}, {1}`, and stores the lineages in the links array. This way links are always fresh, renaming or reorganizing doesn't break anything.
 
-- Full edit history
-- Content-addressable deduplication via `content_hash`
-- Safe concurrent reads (no dirty reads or update conflicts)
 
-The `content_template` stores text with `{0}`, `{1}` placeholders where wiki links appear:
-
-```
-content_template: "See {0} for the details."
-links: ["550e8400-e29b-41d4-a716-446655440001"]
-```
-
-The `links` array holds lineage IDs (not atom IDs) in placeholder order. This matters: links always point to the stable lineage identity, so they survive content edits.
-
-### Lineages — Mutable Identity Pointers
+### Lineages 
 
 ```sql
 CREATE TABLE lineages (
@@ -132,7 +109,7 @@ CREATE TABLE lineages (
 );
 ```
 
-A lineage is a **mutable pointer** to whichever atom snapshot is currently "live". When you edit content:
+A lineage is a mutable pointer denoting the current version of some atomic piece of data.
 
 1. A new atom is created with `predecessor_id = old_atom.id`
 2. `lineages.current_id` is updated to point at the new atom
@@ -154,11 +131,11 @@ CREATE TABLE blocks (
 );
 ```
 
-Blocks place lineages in the hierarchy. Multiple blocks can reference the same lineage (the same content appears in multiple locations). The `parent_id` self-reference defines the tree structure. NULL `parent_id` means a root block.
+Blocks place lineages in the hierarchy. Multiple blocks can reference the same lineage, it's not a 1:1 relationship! This allows for things like hard linking. For example, suppose you have someones contact information linked to multiple projects but you want to keep it up to date everywhere.
 
-`position` is a fractional index string for lexicographic ordering — this allows inserting between any two positions without renumbering.
+Within the hierarchy, siblings are ordered via fractional indexing. We have to be very careful that the front and back end implementations are the same.
 
-The "namespace path" (`research::ml::attention`) is computed by walking the `parent_id` chain and joining block names with `::`. It is not stored; it is derived on read.
+The "namespace path" (`research::ml::attention`) is computed by walking the `parent_id` chain and joining block names with `::`. Namespaces aren't exactly 'real', but rather derived on demand for human use. 
 
 ### Edges — Semantic Relationships
 
@@ -173,54 +150,28 @@ CREATE TABLE edges (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
-
-Edges are explicit semantic relationships between lineages that are not inline content links and not parent-child hierarchy. Examples: `references`, `inspired-by`, `depends-on`, `blocks`.
-
-There's a unique constraint on `(from_lineage_id, to_lineage_id, edge_type)` where `deleted_at IS NULL`, preventing duplicate edges of the same type between the same pair.
+This is mostly a placeholder for later. What's the distinction between a wikilink and an edge? Great question. Originally edges were used in place of parent_ids to build the hierarchy. 
 
 ---
 
 ## Content Storage Model
 
-### Editor View vs. Storage
+As mentioned before, wikilinks are syntactic sugar and the backend doesn't know about them. There are a couple other instances of this. Therefore, we have a serialization/deserialization round trip.
 
-The editor shows wiki-link syntax:
+### Serialization (client -> storage)
 
-```
-See [[research::ml::attention]] for the details.
-Also related to [[./sibling-note]].
-```
-
-Storage separates template from references:
-
-```
-content_template: "See {0} for the details.\nAlso related to {1}."
-links: [
-    "019x-lineage-id-for-attention",
-    "019x-lineage-id-for-sibling"
-]
-```
-
-### Why This Matters
-
-**Links survive moves.** Blocks can be moved to different namespaces. The displayed path `[[research::ml::attention]]` is derived dynamically from the current block location. The stored link is a lineage ID. If you move the `attention` block to `projects::papers::attention`, all links that referenced it will show the new path on the next read — no link rot.
-
-**Immutable atoms enable deduplication.** The `content_hash` is a SHA-256 of the content type, template, and sorted link lineage IDs. Two identical notes get the same hash, enabling dedup during import (`merge` mode).
-
-### Serialization (Editor → Storage)
-
-When saving:
+When saving (assuming a dirty edit):
 
 1. Parse the content for `[[...]]` wiki links
-2. Resolve each link path to a lineage ID via the `blocks` table
+2. Resolve each link path to a lineage ID 
 3. Replace each `[[path]]` with `{N}` placeholder
 4. Store lineage IDs in order in the `links` array
 5. Create a new atom with `predecessor_id = current_atom_id`
 6. Update lineage to point at the new atom
 
-Unresolved links (path not found) are kept as literal text; they show up differently in the UI.
+Unresolved links are kept as literal text, and if an unparsed link makes it to the backend nothing special happens. Again, the backend doesn't know about the links.
 
-### Deserialization (Storage → Editor)
+### Deserialization (storage -> client)
 
 When loading:
 
@@ -240,7 +191,7 @@ When loading:
 [[namespace::path::to::"block name"]]
 ```
 
-The parser is a hand-written state machine (not regex) to handle quoted segments, escape sequences, and relative paths correctly.
+The parser a basic state machine (not regex, might move to nom later) to handle quoted segments, escape sequences, and relative paths correctly. Basically works like posix paths but with double colons for separators.
 
 | Syntax | Resolution |
 |--------|-----------|
@@ -256,11 +207,11 @@ The parser is a hand-written state machine (not regex) to handle quoted segments
 
 ## Custom Types
 
-The custom types system lets you define structured schemas and create typed entries (blocks with a custom content type).
+Everyone has different units of 'thing' they're going to use. Todo lists, contacts, books, games, whatever. This gives a way to define, view, and edit types. Later will include querying.
 
 ### Content types
 
-Every block has a `content_type` that determines how it is rendered:
+Every block has a `content_type` that determines how it is rendered, with an implicit default that's essentially yap augmented markdown. Some built in content types have custom views, but primitives are also available that compose on the fly for user defined custom types.
 
 | Content Type | Description |
 |-------------|-------------|
@@ -274,7 +225,7 @@ Every block has a `content_type` that determines how it is rendered:
 
 ### How schemas are stored
 
-A schema is an ordinary block with `content_type = "schema"`. Its `properties` JSONB field holds the field definitions:
+A schema is technically self describing; `content_type = "schema"`, with fields stored as properties.
 
 ```json
 {
@@ -288,13 +239,12 @@ A schema is an ordinary block with `content_type = "schema"`. Its `properties` J
 
 Schema field types: `string`, `number`, `boolean`, `date`, `enum`, `ref`, `text`.
 
-The `ref` field type creates a reference to another typed entry, with `target_type` specifying the expected type name.
+The `ref` field type creates a reference to another typed entry, with `target_type` specifying the expected type name. This should, whether now or in the future, enable composing and nesting types.
 
-Schemas live under `types::<name>` in the namespace tree (e.g. `types::person`). Local overrides at `<namespace>::types::<name>` shadow the global one — resolution walks up the namespace hierarchy until a match is found.
+Schemas live under `types::<name>` in the namespace tree (e.g. `types::person`). Local overrides at `<namespace>::types::<name>` shadow the global one — resolution walks up the namespace hierarchy until a match is found. This means you can also import someone elses typed content to a namespace without their or your content breaking!
 
-### Entries (typed blocks)
-
-An entry is a regular block with a custom content type. Its atom has:
+### Entries
+The term for an instance of a content type. The schema is addressed by atom, so updates to the schema don't break old entries.
 
 - `content_type` — the schema name (e.g. `"person"`)
 - `properties` — field values plus schema version pinning:
@@ -306,67 +256,49 @@ An entry is a regular block with a custom content type. Its atom has:
   "role": "engineer"
 }
 ```
-
-The `_schema_atom_id` pins the entry to the specific schema version it was created against.
-
 ### Two-tier view system
 
-Entries are rendered by a two-tier view system:
-
-1. **Custom views** — registered in `typeViewRegistry.ts`, these override the default rendering for specific content types (e.g., `TodoView` for `todo`, `SettingsView` for `setting`).
+1. Built in: registered in `typeViewRegistry.ts`, these override the default rendering for specific built in content types (e.g., `TodoView` for `todo`, `SettingsView` for `setting`).
 2. **EntryView** — the generic fallback that auto-generates a schema-driven form from the entry's schema fields. Each field type has a dedicated field view component in `views/fields/` (StringField, NumberField, BooleanField, DateField, EnumField, TextField, RefField).
 
-Entries store all data in `properties` — there is no freeform content on typed blocks (except via `text` fields defined in the schema).
+Entries store all data in `properties`, there is no freeform content on typed blocks. This way there's no confusion about what 'is' an entry.
 
 ### Nav/edit mode
 
-All custom views (EntryView, TodoView, SchemaView) support two display modes, matching the same Enter/Escape pattern as regular content blocks:
+The outliner is modal, and so the views have two modes. Generally, nav mode views should be compact and scannable, edit mode should be more formatted, tab navigable, and follow the enter/escape focus/blur patterns
 
-- **Nav mode** (default) — compact, inline summary for scanning:
-  - EntryView: `name: Alice · email: alice@ex.com`
-  - TodoView: `[checkbox] STATUS description... time`
-  - SchemaView: `name:string · email:string · birthday:date`
-- **Edit mode** — full form, activated by Enter or click:
-  - Tab/Shift+Tab cycles between inputs within the view
-  - Escape saves and exits back to nav mode
-  - First input is auto-focused on entry
 
-OutlinerNode passes `{isEditing}` as a prop to all custom and entry views. Views accept `isEditing` as an optional boolean prop (default `false`). In nav mode, views do not block click propagation, so clicking a custom view block enters edit mode the same way clicking a regular content block does.
+### Entry instantiation
 
-### The `@type{...}` creation command
-
-In the editor, type `@type{...}` to create a new typed entry. This is a one-shot client-side command, not persistent syntax:
+In the editor, type `@type{...}` to create a new typed entry. This is, again, client side sugar.
 
 ```
 @person{"name":"Alice","email":"alice@example.com"}
 ```
 
-On save, the `typeCommand.ts` parser extracts the command, sets `content_type = "person"` and the field values as `properties` on the block itself. The server never sees the `@type{...}` syntax — it only receives the resulting content_type and properties.
+On save, the `typeCommand.ts` parser extracts the command, sets `content_type = "person"` and the field values as `properties` on the block itself. The server never sees the `@type{...}` syntax.
 
 ### Core/server is dumb
 
-The core and server layers are type-unaware. They store `content_type` and `properties` as opaque values with no validation. All type logic (schema resolution, field rendering, `@type{...}` parsing) lives in the frontend.
+The core and server layers are type-unaware. They store `content_type` and `properties` blindly and with NO validation. Any of that is client side.
 
-### DB index
-
-Migration `002_content_type_index.sql` adds a B-tree index on `atoms(content_type)` for efficient type-filtered queries.
-
-### Atom snapshot endpoint
-
-`GET /api/atoms/snapshot/:atom_id` returns a specific atom snapshot by its atom ID (not lineage ID). This is used to retrieve pinned schema versions via `_schema_atom_id`. Backed by the `get_atom_by_id()` Store method.
 
 ---
 
 ## Export / Import
 
-The `yap-tree-v1` format exports a subtree as a self-contained JSON bundle. See [export-format.md](./export-format.md) for the full specification.
+The `yap-tree-v2` format exports a subtree as a self-contained JSON bundle. See [export-format.md](./export-format.md) for the full specification.
 
-Two import modes:
+Modes:
 
-- **merge** (default): Deduplicates nodes via `_import_hash` stored in atom properties. If an identical node already exists in the target database, it is reused. External links (pointing outside the exported subtree) are resolved against the target database.
-- **copy**: Creates all nodes with fresh UUIDs. External links become `Uuid::nil()` (the zero UUID), visually marked as unresolved.
+- merge: Deduplicates nodes via `_import_hash` stored in atom properties and resolves internal links
+- copy: Creates all nodes with fresh UUIDs; basically copies the content literally. External links become `Uuid::nil()`.
+- root: Create the tree you're importing at the root, instead of some specified parent.
+- Global match: Globally matches content and resolves links instead of only within the file being imported.
 
----
+
+
+--- everything above hand written and current 2026-03-22
 
 ## Crate Structure
 

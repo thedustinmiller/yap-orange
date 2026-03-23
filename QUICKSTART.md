@@ -1,6 +1,6 @@
-# Quick Start
+# Development Quick Start
 
-Get a yap-orange development environment running. Choose the deployment mode that fits your needs.
+
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ Get a yap-orange development environment running. Choose the deployment mode tha
 ## Clone and Setup
 
 ```bash
-git clone https://git.rcr.pub/dustin/yap-orange.git
+git clone https://github.com/thedustinmiller/yap-orange.git
 cd yap-orange
 cp .env.example .env
 ```
@@ -47,11 +47,17 @@ Self-contained desktop application using Tauri. Embeds PostgreSQL via pg-embed â
 cd crates/yap-desktop && cargo tauri dev
 ```
 
-First run downloads the PostgreSQL binary (~50 MB) to `~/.cache/pg-embed/`. Data is persisted to `~/.local/share/yap-orange/` (Linux) or `~/Library/Application Support/yap-orange/` (macOS).
+or
+
+```bash
+cargo xtask run desktop
+```
+
+Downloads postgres via pg-embed, saves files and caches data in XDG standard locations.
 
 ## Browser SPA (WASM)
 
-Runs the entire API server as WebAssembly inside the browser. No backend server or Docker needed. Data persists in browser storage (OPFS).
+Runs the entire API server as WASM inside the browser. No backend server or Docker needed. Data persists in browser storage (OPFS).
 
 ```bash
 # Build the WASM module
@@ -59,6 +65,11 @@ cargo xtask build wasm
 
 # Start the web UI
 cd web && npm install && npm run dev
+```
+or
+
+```bash
+cargo xtask run web
 ```
 
 Open http://localhost:5173. The app auto-detects that no backend is running and boots in WASM mode.
@@ -70,10 +81,10 @@ cargo xtask test all       # Everything (Rust + frontend)
 cargo xtask test rust      # Rust workspace tests
 cargo xtask test web       # Frontend tests (vitest + Playwright)
 cargo xtask test unit      # Vitest unit tests only
-cargo xtask test e2e       # Playwright E2E tests only
+cargo xtask test e2e       # Playwright E2E, including accessibility 
 ```
 
-Rust tests require PostgreSQL for the full suite. Without `DATABASE_URL`, PG-specific tests are skipped and SQLite variants run instead.
+Rust tests require PostgreSQL for the full suite.
 
 ## Seeding Sample Data
 
