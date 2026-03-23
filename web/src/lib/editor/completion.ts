@@ -148,12 +148,48 @@ async function typeCommandSource(
 }
 
 /**
- * Returns a CM6 autocompletion extension configured for wiki link
- * and @type{...} entry creation completion.
+ * Autocomplete source for ![[embed]] syntax.
+ * Triggers when user types `![[` — same block search as wiki links.
+ */
+async function embedLinkSource(
+  context: CompletionContext,
+): Promise<CompletionResult | null> {
+  const match = context.matchBefore(/!\[\[([^\]]*)/)
+  if (!match) return null
+
+  const query = match.text.slice(3) // strip `![[`
+  const from = match.from + 3 // completion replaces after `![[`
+
+  try {
+    const blocks = await api.blocks.list(
+      query.length > 0 ? { search: query } : undefined,
+    )
+    const options = blocks.slice(0, 8).map((block) => ({
+      label: block.namespace,
+      apply: `${block.namespace}]]`,
+      type: 'text' as const,
+    }))
+
+    if (options.length === 0) return null
+
+    return {
+      from,
+      options,
+      validFor: /^[^\]]*$/,
+    }
+  } catch {
+    console.warn('Embed completion fetch failed')
+    return null
+  }
+}
+
+/**
+ * Returns a CM6 autocompletion extension configured for wiki link,
+ * embed link, and @type{...} entry creation completion.
  */
 export function wikiLinkCompletion(): Extension {
   return autocompletion({
-    override: [wikiLinkSource, typeCommandSource],
+    override: [embedLinkSource, wikiLinkSource, typeCommandSource],
     icons: false,
   })
 }

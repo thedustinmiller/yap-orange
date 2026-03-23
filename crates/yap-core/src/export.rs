@@ -47,6 +47,20 @@ pub struct ExportTree {
     pub topology_hash: String,
 }
 
+/// Collect all unique file hashes referenced by media blocks in an export tree.
+///
+/// Scans `properties.file_hash` on each node. Returns a deduplicated list of
+/// hash strings that can be bundled into a ZIP alongside the JSON export.
+pub fn collect_file_hashes(tree: &ExportTree) -> Vec<String> {
+    let mut hashes = std::collections::HashSet::new();
+    for node in &tree.nodes {
+        if let Some(hash) = node.properties.get("file_hash").and_then(|v| v.as_str()) {
+            hashes.insert(hash.to_string());
+        }
+    }
+    hashes.into_iter().collect()
+}
+
 /// A single exported block+atom pair.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]

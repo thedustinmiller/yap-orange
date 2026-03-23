@@ -1,7 +1,8 @@
 {
-  "format": "yap-tree-v1",
-  "exported_at": "2026-03-21T00:00:00Z",
+  "format": "yap-tree-v2",
+  "exported_at": "2026-03-23T00:00:00Z",
   "source_namespace": "tutorial",
+  "topology_hash": "",
   "nodes": [
     {
       "local_id": 0,
@@ -12,6 +13,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": null,
       "position": "80",
       "children_local_ids": [1, 2, 3, 4, 5, 6]
@@ -31,6 +34,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 0,
       "position": "80",
       "children_local_ids": []
@@ -44,6 +49,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 0,
       "position": "8180",
       "children_local_ids": [7, 8, 9, 10, 11]
@@ -57,6 +64,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 0,
       "position": "8280",
       "children_local_ids": [12, 13, 14, 15]
@@ -70,9 +79,11 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 0,
       "position": "8380",
-      "children_local_ids": [16, 17, 18, 27, 28, 29, 30]
+      "children_local_ids": [16, 17, 18, 27, 28]
     },
     {
       "local_id": 5,
@@ -83,6 +94,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 0,
       "position": "8480",
       "children_local_ids": [19, 20, 21]
@@ -96,6 +109,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 0,
       "position": "8580",
       "children_local_ids": [22, 23, 24, 25, 26]
@@ -109,6 +124,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 2,
       "position": "80",
       "children_local_ids": []
@@ -124,6 +141,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 2,
       "position": "8180",
       "children_local_ids": []
@@ -139,6 +158,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 2,
       "position": "8280",
       "children_local_ids": []
@@ -147,7 +168,7 @@
       "local_id": 10,
       "name": "editing",
       "content_type": "content",
-      "content_template": "The editor uses CodeMirror 6 with Markdown support. Key features:\n\n- **Wiki-links** \u2014 type `[[` to start a link (see {0})\n- **Typed entries** \u2014 type `@type{...}` to create a typed entry (see {1})\n- **Escape** saves and exits edit mode\n- **Shift+Enter** inserts a newline within the block\n- **Enter** creates a new sibling block below",
+      "content_template": "The editor uses CodeMirror 6 with Markdown support. Key features:\n\n- **Wiki-links** \u2014 type `[[` to start a link (see {0})\n- **Embeds** \u2014 type `![[` to embed another block inline\n- **Typed entries** \u2014 type `@type{...}` to create a typed entry (see {1})\n- **Escape** saves and exits edit mode\n- **Shift+Enter** inserts a newline within the block\n- **Enter** creates a new sibling block below",
       "internal_links": [
         { "placeholder_index": 0, "target_local_id": 12 },
         { "placeholder_index": 1, "target_local_id": 16 }
@@ -155,6 +176,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 2,
       "position": "8380",
       "children_local_ids": []
@@ -170,6 +193,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 2,
       "position": "8480",
       "children_local_ids": []
@@ -185,6 +210,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 3,
       "position": "80",
       "children_local_ids": []
@@ -198,6 +225,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 3,
       "position": "8180",
       "children_local_ids": []
@@ -211,6 +240,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 3,
       "position": "8280",
       "children_local_ids": []
@@ -229,6 +260,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 3,
       "position": "8380",
       "children_local_ids": []
@@ -242,6 +275,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 4,
       "position": "80",
       "children_local_ids": []
@@ -257,6 +292,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 4,
       "position": "8180",
       "children_local_ids": []
@@ -265,11 +302,13 @@
       "local_id": 18,
       "name": "creating schemas",
       "content_type": "content",
-      "content_template": "A schema defines the fields for a custom type. Click a schema to see its compact field summary (nav mode), then click or press Enter to open the field editor (edit mode).\n\nThe field editor lets you:\n- Add fields with a **name** and **type** (string, number, boolean, date, enum, relation, text)\n- Mark fields as **required**\n- Define **enum options** (comma-separated values)\n- Set a **target type** for relation fields\n\nOnce defined, create a typed entry by typing `@typeName{\"field\":\"value\"}` as the entire content of a new block. On save, the block's content type and properties are set automatically.",
+      "content_template": "A schema defines the fields for a custom type. Click a schema to see its compact field summary (nav mode), then click or press Enter to open the field editor (edit mode).\n\nThe field editor lets you:\n- Add fields with a **name** and **type** (string, number, boolean, date, enum, ref, text)\n- Mark fields as **required**\n- Define **enum options** (comma-separated values)\n- Set a **target type** for ref fields\n\nOnce defined, create a typed entry by typing `@typeName{\"field\":\"value\"}` as the entire content of a new block. On save, the block's content type and properties are set automatically.",
       "internal_links": [],
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 4,
       "position": "8280",
       "children_local_ids": []
@@ -283,6 +322,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 5,
       "position": "80",
       "children_local_ids": []
@@ -298,6 +339,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 5,
       "position": "8180",
       "children_local_ids": []
@@ -311,6 +354,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 5,
       "position": "8280",
       "children_local_ids": []
@@ -319,11 +364,13 @@
       "local_id": 22,
       "name": "drag and drop",
       "content_type": "content",
-      "content_template": "Drag blocks in the outliner to reorganize content:\n\n- **Drop on a block** \u2014 makes it a child (nesting)\n- **Drop between blocks** \u2014 reorders siblings\n- **Drop on the sidebar** \u2014 moves to a different namespace\n\nDrag-and-drop preserves all links. Since links target lineage IDs (not paths), moving a block never breaks references to it.",
+      "content_template": "Drag blocks in the outliner to reorganize content:\n\n- **Drop on a block** \u2014 makes it a child (nesting)\n- **Drop between blocks** \u2014 reorders siblings\n- **Drop on the sidebar** \u2014 moves to a different namespace\n\nYou can also drag external files (images, PDFs, documents) onto the outliner to attach them as media blocks. Drag-and-drop preserves all links. Since links target lineage IDs (not paths), moving a block never breaks references to it.",
       "internal_links": [],
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 6,
       "position": "80",
       "children_local_ids": []
@@ -339,6 +386,8 @@
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 6,
       "position": "8180",
       "children_local_ids": []
@@ -347,11 +396,13 @@
       "local_id": 24,
       "name": "keyboard shortcuts",
       "content_type": "content",
-      "content_template": "**Panel navigation:**\n- Alt+1 \u2014 Navigator (sidebar)\n- Alt+2 \u2014 Bookmarks\n- Alt+3 \u2014 Links (backlinks)\n- Alt+4 \u2014 Properties\n- Alt+5 \u2014 Graph\n- Ctrl+K \u2014 Quick Switcher (MRU panel list)\n\n**Outliner (navigate mode):**\n- Arrow Up/Down \u2014 Move selection\n- Arrow Right/Left \u2014 Expand/collapse\n- Enter \u2014 Edit selected block\n- Tab / Shift+Tab \u2014 Indent / outdent\n- Delete \u2014 Delete selected block\n\n**Editor (edit mode):**\n- Escape or Cmd+Enter \u2014 Save and exit\n- Enter \u2014 New sibling block\n- Shift+Enter \u2014 Newline within block\n- `[[` \u2014 Wiki-link completion\n- `@type{...}` \u2014 Create typed entry",
+      "content_template": "**Panel navigation:**\n- Alt+1 \u2014 Navigator (sidebar)\n- Alt+2 \u2014 Bookmarks\n- Alt+3 \u2014 Links (backlinks)\n- Alt+4 \u2014 Properties\n- Alt+5 \u2014 Graph\n- Ctrl+K \u2014 Quick Switcher (MRU panel list)\n\n**Outliner (navigate mode):**\n- Arrow Up/Down \u2014 Move selection\n- Arrow Right/Left \u2014 Expand/collapse\n- Enter \u2014 Edit selected block\n- Tab / Shift+Tab \u2014 Indent / outdent\n- Delete \u2014 Delete selected block\n\n**Editor (edit mode):**\n- Escape or Cmd+Enter \u2014 Save and exit\n- Enter \u2014 New sibling block\n- Shift+Enter \u2014 Newline within block\n- `[[` \u2014 Wiki-link completion\n- `![[` \u2014 Embed another block inline\n- `@type{...}` \u2014 Create typed entry",
       "internal_links": [],
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 6,
       "position": "8280",
       "children_local_ids": []
@@ -360,11 +411,13 @@
       "local_id": 25,
       "name": "context menu",
       "content_type": "content",
-      "content_template": "Right-click any block in the outliner or sidebar to access the context menu:\n\n- **Edit** \u2014 enter edit mode\n- **Rename** \u2014 change the block name\n- **Delete** \u2014 soft-delete the block (restorable)\n- **Copy link** \u2014 copy the wiki-link path to clipboard\n- **Export** \u2014 export the subtree as JSON\n\nDeleted blocks can be restored. Links to deleted blocks are preserved and will work again after restoration.",
+      "content_template": "Right-click any block in the outliner or sidebar to access the context menu:\n\n- **Edit** \u2014 enter edit mode\n- **Rename** \u2014 change the block name\n- **Delete** \u2014 soft-delete the block (restorable)\n- **Copy link** \u2014 copy the wiki-link path to clipboard\n- **Attach file...** \u2014 attach an image, PDF, or document as a child block\n- **Import from file...** \u2014 import a yap export (JSON or ZIP)\n- **Export** \u2014 export the subtree as JSON or ZIP\n\nDeleted blocks can be restored. Links to deleted blocks are preserved and will work again after restoration.",
       "internal_links": [],
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 6,
       "position": "8380",
       "children_local_ids": []
@@ -373,56 +426,19 @@
       "local_id": 26,
       "name": "tips and tricks",
       "content_type": "content",
-      "content_template": "A few tips to get the most out of yap-orange:\n\n1. **Quick Switcher** (Ctrl+K) \u2014 jump between panels instantly\n2. **Bookmarks** (Alt+2) \u2014 pin frequently used blocks for fast access\n3. **Properties** (Alt+4) \u2014 add metadata like tags, status, or dates to any block\n4. **Graph view** (Alt+5) \u2014 visualize connections between blocks\n5. **Import/Export** \u2014 back up subtrees as JSON or share them between instances\n\nThis tutorial was auto-imported as seed data on first run. Feel free to edit, reorganize, or delete it.",
+      "content_template": "A few tips to get the most out of yap-orange:\n\n1. **Quick Switcher** (Ctrl+K) \u2014 jump between panels instantly\n2. **Bookmarks** (Alt+2) \u2014 pin frequently used blocks for fast access\n3. **Properties** (Alt+4) \u2014 add metadata like tags, status, or dates to any block\n4. **Graph view** (Alt+5) \u2014 visualize connections between blocks\n5. **Import/Export** \u2014 back up subtrees as JSON or ZIP, share them between instances\n6. **Embeds** \u2014 use `![[path]]` to embed images or other blocks inline\n\nThis tutorial was auto-imported as seed data on first run. Feel free to edit, reorganize, or delete it.",
       "internal_links": [],
       "external_links": [],
       "properties": {},
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 6,
       "position": "8480",
       "children_local_ids": []
     },
     {
       "local_id": 27,
-      "name": "todo",
-      "content_type": "schema",
-      "content_template": "",
-      "internal_links": [],
-      "external_links": [],
-      "properties": {
-        "fields": [
-          { "name": "status", "type": "enum", "required": true, "options": ["todo", "doing", "done"] },
-          { "name": "description", "type": "text", "required": false },
-          { "name": "time_ranges", "type": "text", "required": false }
-        ]
-      },
-      "export_hash": "",
-      "parent_local_id": 4,
-      "position": "8380",
-      "children_local_ids": []
-    },
-    {
-      "local_id": 28,
-      "name": "person",
-      "content_type": "schema",
-      "content_template": "",
-      "internal_links": [],
-      "external_links": [],
-      "properties": {
-        "fields": [
-          { "name": "name", "type": "string", "required": true },
-          { "name": "email", "type": "string", "required": false },
-          { "name": "birthday", "type": "date", "required": false },
-          { "name": "notes", "type": "text", "required": false }
-        ]
-      },
-      "export_hash": "",
-      "parent_local_id": 4,
-      "position": "8480",
-      "children_local_ids": []
-    },
-    {
-      "local_id": 29,
       "name": "example todo",
       "content_type": "todo",
       "content_template": "",
@@ -434,12 +450,14 @@
         "time_ranges": []
       },
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 4,
-      "position": "8580",
+      "position": "8380",
       "children_local_ids": []
     },
     {
-      "local_id": 30,
+      "local_id": 28,
       "name": "example person",
       "content_type": "person",
       "content_template": "",
@@ -452,8 +470,10 @@
         "notes": "Pioneer of computer programming"
       },
       "export_hash": "",
+      "content_identity_hash": "",
+      "merkle_hash": "",
       "parent_local_id": 4,
-      "position": "8680",
+      "position": "8480",
       "children_local_ids": []
     }
   ],

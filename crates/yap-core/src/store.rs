@@ -459,7 +459,11 @@ pub trait Store: Send + Sync {
                     .await?;
                 match resolved {
                     Some(lineage_id) => {
-                        tmpl.push_str(&format!("{{{}}}", link_ids.len()));
+                        if link.is_embed {
+                            tmpl.push_str(&format!("!{{{}}}", link_ids.len()));
+                        } else {
+                            tmpl.push_str(&format!("{{{}}}", link_ids.len()));
+                        }
                         link_ids.push(lineage_id);
                     }
                     None => {

@@ -39,6 +39,7 @@ postgres_data
 references
 # mdbook build output
 guide/book/
+files/
 
 # Test coverage output
 web/coverage/

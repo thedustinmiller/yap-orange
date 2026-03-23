@@ -80,6 +80,10 @@ rand = "0.9"
 # Fractional indexing for CRDT-friendly ordering
 fractional_index = "2"
 
+# ZIP archive support (export/import with media files)
+# default-features = false avoids lzma-sys (C code that can't compile to wasm32)
+zip = { version = "2", default-features = false, features = ["deflate"] }
+
 # Markdown parsing
 comrak = { version = "0.36", default-features = false, features = ["shortcodes"] }
 

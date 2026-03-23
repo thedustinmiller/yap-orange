@@ -11,11 +11,12 @@ use std::ptr;
 
 use sqlite_wasm_rs::{
     sqlite3, sqlite3_stmt,
-    sqlite3_bind_int, sqlite3_bind_null, sqlite3_bind_text,
-    sqlite3_changes, sqlite3_close, sqlite3_column_count, sqlite3_column_int,
+    sqlite3_bind_blob, sqlite3_bind_int, sqlite3_bind_null, sqlite3_bind_text,
+    sqlite3_changes, sqlite3_close, sqlite3_column_blob, sqlite3_column_bytes,
+    sqlite3_column_count, sqlite3_column_int,
     sqlite3_column_text, sqlite3_column_type, sqlite3_errmsg, sqlite3_exec,
     sqlite3_finalize, sqlite3_open_v2, sqlite3_prepare_v2, sqlite3_step,
-    SQLITE_DONE, SQLITE_NULL, SQLITE_OK, SQLITE_OPEN_CREATE, SQLITE_OPEN_READWRITE,
+    SQLITE_BLOB, SQLITE_DONE, SQLITE_NULL, SQLITE_OK, SQLITE_OPEN_CREATE, SQLITE_OPEN_READWRITE,
     SQLITE_ROW, SQLITE_TRANSIENT,
 };
 
@@ -27,6 +28,7 @@ type Result<T> = yap_core::error::Result<T>;
 pub enum Value<'a> {
     Text(&'a str),
     Int(i32),
+    Blob(&'a [u8]),
     Null,
 }
 
@@ -273,6 +275,46 @@ impl WasmDb {
         result
     }
 
+    /// Execute a query and return the first column of the first row as a BLOB.
+    /// Used for reading binary file data.
+    pub fn query_scalar_blob(&self, sql: &str, params: &[Value]) -> Result<Option<Vec<u8>>> {
+        let stmt = self.prepare(sql)?;
+        self.bind_params(stmt, params)?;
+
+        let rc = unsafe { sqlite3_step(stmt) };
+        let result = match rc {
+            SQLITE_ROW => {
+                let col_type = unsafe { sqlite3_column_type(stmt, 0) };
+                if col_type == SQLITE_NULL {
+                    Ok(None)
+                } else if col_type == SQLITE_BLOB {
+                    let ptr = unsafe { sqlite3_column_blob(stmt, 0) };
+                    let len = unsafe { sqlite3_column_bytes(stmt, 0) } as usize;
+                    if ptr.is_null() || len == 0 {
+                        Ok(Some(Vec::new()))
+                    } else {
+                        let slice = unsafe { std::slice::from_raw_parts(ptr as *const u8, len) };
+                        Ok(Some(slice.to_vec()))
+                    }
+                } else {
+                    // Non-blob column — try reading as text and converting
+                    let ptr = unsafe { sqlite3_column_text(stmt, 0) };
+                    if ptr.is_null() {
+                        Ok(None)
+                    } else {
+                        let cstr = unsafe { core::ffi::CStr::from_ptr(ptr as *const c_char) };
+                        Ok(Some(cstr.to_bytes().to_vec()))
+                    }
+                }
+            }
+            SQLITE_DONE => Ok(None),
+            _ => Err(self.last_error("sqlite3_step")),
+        };
+
+        unsafe { sqlite3_finalize(stmt) };
+        result
+    }
+
     // ── Private helpers ──────────────────────────────────────────────────
 
     fn prepare(&self, sql: &str) -> Result<*mut sqlite3_stmt> {
@@ -312,6 +354,15 @@ impl WasmDb {
                     }
                 }
                 Value::Int(v) => unsafe { sqlite3_bind_int(stmt, idx, *v) },
+                Value::Blob(data) => unsafe {
+                    sqlite3_bind_blob(
+                        stmt,
+                        idx,
+                        data.as_ptr() as *const _,
+                        data.len() as c_int,
+                        SQLITE_TRANSIENT(),
+                    )
+                },
                 Value::Null => unsafe { sqlite3_bind_null(stmt, idx) },
             };
             if rc != SQLITE_OK {

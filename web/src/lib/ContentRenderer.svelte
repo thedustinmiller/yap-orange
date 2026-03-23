@@ -1,15 +1,56 @@
 <script lang="ts">
   import { renderMarkdown } from './editor/renderMarkdown';
+  import { mount, unmount } from 'svelte';
+  import EmbedRenderer from './views/EmbedRenderer.svelte';
 
   let {
     content,
     onNavigateLink,
+    embedDepth = 0,
   }: {
     content: string;
     onNavigateLink?: (path: string) => void;
+    embedDepth?: number;
   } = $props();
 
   let html = $derived(renderMarkdown(content));
+
+  let containerEl: HTMLElement | undefined = $state();
+  let mountedEmbeds: any[] = [];
+
+  // Mount embed components into .block-embed placeholder spans after HTML renders
+  $effect(() => {
+    // Touch html to re-run when content changes
+    void html;
+
+    // Clean up previous embeds
+    for (const embed of mountedEmbeds) {
+      try { unmount(embed); } catch { /* already unmounted */ }
+    }
+    mountedEmbeds = [];
+
+    if (!containerEl) return;
+
+    // Wait a tick for {@html} to render
+    requestAnimationFrame(() => {
+      if (!containerEl) return;
+      const placeholders = containerEl.querySelectorAll('.block-embed[data-embed-path]');
+      for (const el of placeholders) {
+        const path = (el as HTMLElement).dataset.embedPath;
+        if (!path) continue;
+
+        const component = mount(EmbedRenderer, {
+          target: el,
+          props: {
+            path,
+            depth: embedDepth + 1,
+            onNavigateLink,
+          },
+        });
+        mountedEmbeds.push(component);
+      }
+    });
+  });
 
   function handleClick(e: MouseEvent) {
     const target = e.target as HTMLElement;
@@ -28,7 +69,7 @@
   }
 </script>
 
-<span class="content-rendered" role="presentation" onclick={handleClick}>
+<span class="content-rendered" role="presentation" onclick={handleClick} bind:this={containerEl}>
   {@html html}
 </span>
 

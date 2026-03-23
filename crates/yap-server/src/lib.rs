@@ -18,6 +18,7 @@ use utoipa::OpenApi;
 #[cfg(feature = "openapi")]
 use utoipa_swagger_ui::SwaggerUi;
 use yap_core::Store;
+use yap_core::file_store::FileStore;
 
 pub use log_buffer::{BufferLayer, LogBuffer};
 
@@ -32,6 +33,7 @@ pub use yap_core::bootstrap::{
 pub struct AppState {
     pub db: Arc<dyn Store>,
     pub log_buffer: Arc<LogBuffer>,
+    pub files: Arc<dyn FileStore>,
 }
 
 /// Build the Axum router with all API routes attached to the given state.
@@ -77,7 +79,19 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/schemas", get(api::list_schemas))
         .route("/api/schemas/resolve", post(api::resolve_schema))
         .route("/api/graph/subtree", post(api::get_subtree_graph))
-        .route("/api/debug/logs", get(api::get_debug_logs));
+        .route("/api/debug/logs", get(api::get_debug_logs))
+        .route("/api/files", post(api::upload_file))
+        .route("/api/files/{hash}", get(api::download_file))
+        .route("/api/files/{hash}/check", get(api::check_file))
+        .route(
+            "/api/blocks/{id}/export-zip",
+            get(api::export_block_tree_zip),
+        )
+        .route(
+            "/api/blocks/{id}/import-zip",
+            post(api::import_zip_under_block),
+        )
+        .route("/api/import-zip", post(api::import_zip_at_root));
 
     #[cfg(feature = "bench")]
     let router = router.route("/api/debug/benchmarks", post(api::run_benchmarks_handler));

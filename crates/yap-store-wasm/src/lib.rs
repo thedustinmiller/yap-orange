@@ -91,6 +91,13 @@ CREATE INDEX IF NOT EXISTS idx_blocks_lineage_id ON blocks(lineage_id) WHERE del
 -- Indexes on edges
 CREATE UNIQUE INDEX IF NOT EXISTS idx_edges_unique ON edges(from_lineage_id, to_lineage_id, edge_type) WHERE deleted_at IS NULL;
 CREATE INDEX IF NOT EXISTS idx_edges_to ON edges(to_lineage_id) WHERE deleted_at IS NULL;
+
+-- Content-addressed file storage
+CREATE TABLE IF NOT EXISTS files (
+    hash TEXT PRIMARY KEY,
+    data BLOB NOT NULL,
+    size INTEGER NOT NULL
+);
 "#;
 
 // =============================================================================
@@ -1416,5 +1423,73 @@ impl Store for WasmSqliteStore {
         )?;
 
         Ok(count as i64)
+    }
+}
+
+// =============================================================================
+// WASM File Store — SQLite BLOB-backed FileStore implementation
+// =============================================================================
+
+/// SQLite BLOB-backed file store for WASM.
+///
+/// Stores files in a `files` table with content-addressed SHA-256 hash keys.
+/// This avoids the complexity of raw OPFS file handles and piggybacks on
+/// the existing SQLite-in-OPFS persistence.
+pub struct WasmFileStore {
+    db: WasmDb,
+}
+
+impl WasmFileStore {
+    pub fn new(db: WasmDb) -> Self {
+        Self { db }
+    }
+}
+
+#[async_trait]
+impl yap_core::file_store::FileStore for WasmFileStore {
+    async fn put_file(&self, data: &[u8]) -> Result<String> {
+        let hash = yap_core::file_store::compute_file_hash(data);
+
+        // Check if already exists (dedup)
+        let exists = self.db.query_scalar_int(
+            "SELECT COUNT(*) FROM files WHERE hash = ?1",
+            &[Value::Text(&hash)],
+        )? > 0;
+
+        if !exists {
+            let size_str = data.len().to_string();
+            self.db.execute(
+                "INSERT INTO files (hash, data, size) VALUES (?1, ?2, ?3)",
+                &[Value::Text(&hash), Value::Blob(data), Value::Text(&size_str)],
+            )?;
+        }
+
+        Ok(hash)
+    }
+
+    async fn get_file(&self, hash: &str) -> Result<Option<Vec<u8>>> {
+        self.db.query_scalar_blob(
+            "SELECT data FROM files WHERE hash = ?1",
+            &[Value::Text(hash)],
+        )
+    }
+
+    async fn file_exists(&self, hash: &str) -> Result<bool> {
+        let count = self.db.query_scalar_int(
+            "SELECT COUNT(*) FROM files WHERE hash = ?1",
+            &[Value::Text(hash)],
+        )?;
+        Ok(count > 0)
+    }
+
+    async fn delete_file(&self, hash: &str) -> Result<bool> {
+        let existed = self.file_exists(hash).await?;
+        if existed {
+            self.db.execute(
+                "DELETE FROM files WHERE hash = ?1",
+                &[Value::Text(hash)],
+            )?;
+        }
+        Ok(existed)
     }
 }

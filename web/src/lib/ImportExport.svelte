@@ -81,24 +81,39 @@
     }
   }
 
-  async function openJsonFile(): Promise<any> {
+  let selectedZipFile: File | null = $state(null);
+
+  async function openImportFile(): Promise<any> {
     if ('showOpenFilePicker' in window) {
       const [handle] = await (window as any).showOpenFilePicker({
-        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+        types: [
+          { description: 'JSON or ZIP', accept: { 'application/json': ['.json'], 'application/zip': ['.zip'] } },
+        ],
       });
       const file = await handle.getFile();
       selectedFileName = file.name;
+      if (file.name.endsWith('.zip')) {
+        selectedZipFile = file;
+        return null; // ZIP file — handled separately
+      }
+      selectedZipFile = null;
       return JSON.parse(await file.text());
     } else {
       return new Promise((resolve, reject) => {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.json';
+        input.accept = '.json,.zip';
         input.onchange = async () => {
           const file = input.files?.[0];
           if (!file) return reject(new Error('No file selected'));
           selectedFileName = file.name;
-          resolve(JSON.parse(await file.text()));
+          if (file.name.endsWith('.zip')) {
+            selectedZipFile = file;
+            resolve(null);
+          } else {
+            selectedZipFile = null;
+            resolve(JSON.parse(await file.text()));
+          }
         };
         input.click();
       });
@@ -126,18 +141,65 @@
     }
   }
 
+  async function handleExportZip() {
+    if (!activeBlockId) return;
+    exporting = true;
+    exportStatus = '';
+    try {
+      const blob = await api.importExport.exportZip(activeBlockId);
+      const name = activePath.replace(/::/g, '_') || 'export';
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${name}.zip`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      exportStatus = 'Exported ZIP with files';
+    } catch (err: any) {
+      exportStatus = `Error: ${err.message}`;
+    } finally {
+      exporting = false;
+    }
+  }
+
   async function handleChooseFile() {
     try {
-      selectedData = await openJsonFile();
+      selectedData = await openImportFile();
       importStatus = '';
     } catch {
       console.warn('File selection cancelled or failed');
       selectedData = null;
+      selectedZipFile = null;
       selectedFileName = '';
     }
   }
 
   async function handleImport() {
+    // ZIP import
+    if (selectedZipFile) {
+      importing = true;
+      importStatus = '';
+      try {
+        const parentId = importAtRoot ? undefined : activeBlockId ?? undefined;
+        const result = await api.importExport.importZip(selectedZipFile, parentId, importMode);
+        const created = result.created ?? 0;
+        const skipped = result.skipped ?? 0;
+        importStatus = `Created ${created}, Skipped ${skipped} (from ZIP)`;
+        if (importAtRoot) {
+          await blockTree.loadRoots();
+        } else if (activeBlockId) {
+          await blockTree.loadChildrenWithContent(activeBlockId, true);
+        }
+        selectedZipFile = null;
+        selectedFileName = '';
+      } catch (err: any) {
+        importStatus = `Error: ${err.message}`;
+      } finally {
+        importing = false;
+      }
+      return;
+    }
+
+    // JSON import
     if ((!activeBlockId && !importAtRoot) || !selectedData) return;
     importing = true;
     importStatus = '';
@@ -226,13 +288,23 @@
         </div>
       {/if}
 
-      <button
-        class="ie-btn"
-        disabled={!activeBlockId || exporting}
-        onclick={handleExport}
-      >
-        {exporting ? 'Exporting...' : 'Export'}
-      </button>
+      <div class="ie-btn-row">
+        <button
+          class="ie-btn"
+          disabled={!activeBlockId || exporting}
+          onclick={handleExport}
+        >
+          {exporting ? 'Exporting...' : 'Export JSON'}
+        </button>
+        <button
+          class="ie-btn ie-btn-secondary"
+          disabled={!activeBlockId || exporting}
+          onclick={handleExportZip}
+          title="Export with media files as ZIP"
+        >
+          {exporting ? 'Exporting...' : 'Export ZIP'}
+        </button>
+      </div>
       {#if exportStatus}
         <div class="ie-status" class:ie-error={exportStatus.startsWith('Error')}>{exportStatus}</div>
       {/if}
@@ -289,10 +361,10 @@
 
       <button
         class="ie-btn"
-        disabled={(!activeBlockId && !importAtRoot) || !selectedData || importing}
+        disabled={(!activeBlockId && !importAtRoot) || (!selectedData && !selectedZipFile) || importing}
         onclick={handleImport}
       >
-        {importing ? 'Importing...' : 'Import'}
+        {importing ? 'Importing...' : selectedZipFile ? 'Import ZIP' : 'Import'}
       </button>
       {#if importStatus}
         <div class="ie-status" class:ie-error={importStatus.startsWith('Error')}>{importStatus}</div>
@@ -368,6 +440,16 @@
 
   .ie-btn-secondary {
     background: transparent;
+  }
+
+  .ie-btn-row {
+    display: flex;
+    gap: 6px;
+  }
+
+  .ie-btn-row .ie-btn {
+    flex: 1;
+    margin-bottom: 8px;
   }
 
   .ie-file {

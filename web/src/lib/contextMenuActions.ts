@@ -6,6 +6,9 @@
  */
 
 import type { TreeNode } from './blockTree.svelte';
+import { openFilePicker } from './filePicker';
+import { uploadAndCreateBlock } from './fileUpload';
+import { handleFileDrop } from './fileDrop';
 
 export interface MenuAction {
   /** Unique key for this action */
@@ -29,6 +32,8 @@ export interface MenuContext {
   navigateTo: (id: string) => void
   /** Export subtree rooted at this node */
   exportSubtree: (id: string, namespace: string) => Promise<void>
+  /** Reload the tree after structural changes */
+  reloadTree: () => Promise<void>
 }
 
 export const actions: MenuAction[] = [
@@ -55,6 +60,40 @@ export const actions: MenuAction[] = [
     handler: (node, ctx) => {
       ctx.exportSubtree(node.id, node.namespace);
     },
-    dividerAfter: false,
+    dividerAfter: true,
+  },
+  {
+    id: 'attach-file',
+    label: 'Attach file...',
+    icon: '📎',
+    handler: async (node, ctx) => {
+      const files = await openFilePicker({ multiple: true });
+      if (files.length === 0) return;
+      for (const file of files) {
+        await uploadAndCreateBlock(file, node.id);
+      }
+      await ctx.reloadTree();
+    },
+  },
+  {
+    id: 'import-file',
+    label: 'Import from file...',
+    icon: '↑',
+    handler: async (node, ctx) => {
+      const files = await openFilePicker({ accept: '.json,.zip', multiple: false });
+      if (files.length === 0) return;
+      const file = files[0];
+
+      // Create a minimal FileList-like object for handleFileDrop
+      const dt = new DataTransfer();
+      dt.items.add(file);
+      await handleFileDrop(
+        dt.files,
+        'inside',
+        node,
+        () => '',  // position unused for 'inside' zone
+      );
+      await ctx.reloadTree();
+    },
   },
 ];

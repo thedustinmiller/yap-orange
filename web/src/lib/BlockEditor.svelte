@@ -231,4 +231,29 @@
   :global(.cm-wiki-link-editing) {
     color: var(--link-color);
   }
+
+  /* Embed widget styling (injected by CM6 into the editor) */
+  :global(.cm-embed-widget) {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: var(--bg-tertiary, #24283b);
+    color: var(--text-muted, #7a85b8);
+    border-radius: 3px;
+    padding: 0 5px;
+    font-size: 0.9em;
+    cursor: pointer;
+    vertical-align: baseline;
+  }
+
+  :global(.cm-embed-widget::before) {
+    content: '\229E'; /* ⊞ */
+    font-size: 0.85em;
+    opacity: 0.6;
+  }
+
+  :global(.cm-embed-widget:hover) {
+    background: var(--bg-active, #292e42);
+    color: var(--text-primary, #ccc);
+  }
 </style>

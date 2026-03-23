@@ -21,7 +21,7 @@ use yap_core::Store as _;
 use yap_server::log_buffer::LogBuffer;
 use yap_server::{AppState, build_router};
 use yap_store_wasm::db::WasmDb;
-use yap_store_wasm::WasmSqliteStore;
+use yap_store_wasm::{WasmFileStore, WasmSqliteStore};
 
 // thread_local is fine — WASM is single-threaded.
 thread_local! {
@@ -62,11 +62,19 @@ pub async fn init() -> std::result::Result<(), JsValue> {
         .await
         .map_err(|e| JsValue::from_str(&format!("Bootstrap failed: {}", e)))?;
 
-    // 6. Build router and store references
+    // 6. Open a second connection for the file store (same OPFS database)
+    let file_db = WasmDb::open("yap-orange.db")
+        .map_err(|e| JsValue::from_str(&format!("File DB open failed: {}", e)))?;
+    file_db.exec("PRAGMA foreign_keys=ON;")
+        .map_err(|e| JsValue::from_str(&format!("File DB PRAGMA failed: {}", e)))?;
+    let files: Arc<dyn yap_core::file_store::FileStore> = Arc::new(WasmFileStore::new(file_db));
+
+    // 7. Build router and store references
     let log_buffer = LogBuffer::new(500);
     let state = AppState {
         db: store.clone() as Arc<dyn yap_core::Store>,
         log_buffer,
+        files,
     };
     let router = build_router(state);
 

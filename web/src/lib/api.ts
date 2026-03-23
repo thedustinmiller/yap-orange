@@ -342,6 +342,132 @@ const importExport = {
   propertyKeys(blockId: Uuid): Promise<string[]> {
     return get<string[]>(`/api/blocks/${blockId}/property-keys`)
   },
+
+  /** Export subtree as ZIP (with media files). Returns a Blob. */
+  async exportZip(blockId: Uuid): Promise<Blob> {
+    if (isWasmMode()) {
+      // WASM: not supported yet — fall back to JSON
+      throw new Error('ZIP export not supported in WASM mode yet')
+    }
+    const resp = await fetch(`${BASE_URL}/api/blocks/${blockId}/export-zip`)
+    if (!resp.ok) throw await ApiError.fromResponse(resp)
+    return resp.blob()
+  },
+
+  /** Import a ZIP file (base64-encoded). */
+  async importZip(zipFile: File, parentId?: Uuid, mode: 'merge' | 'copy' = 'merge'): Promise<any> {
+    const buffer = await zipFile.arrayBuffer()
+    const bytes = new Uint8Array(buffer)
+    let binary = ''
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i])
+    }
+    const b64 = btoa(binary)
+
+    const modeParam = `?mode=${mode}`
+    const url = parentId
+      ? `/api/blocks/${parentId}/import-zip${modeParam}`
+      : `/api/import-zip${modeParam}`
+    return post<any>(url, { data: b64 })
+  },
+}
+
+// ============================================
+// File Storage Operations
+// ============================================
+
+interface FileUploadResponse {
+  hash: string
+  size: number
+}
+
+const files = {
+  /**
+   * Upload a file. In WASM mode, sends as base64 JSON.
+   * In server/desktop mode, sends as multipart/form-data.
+   */
+  async upload(file: File): Promise<FileUploadResponse> {
+    if (isWasmMode()) {
+      // WASM mode: base64-encode and send as JSON
+      const buffer = await file.arrayBuffer()
+      const bytes = new Uint8Array(buffer)
+      let binary = ''
+      for (let i = 0; i < bytes.length; i++) {
+        binary += String.fromCharCode(bytes[i])
+      }
+      const b64 = btoa(binary)
+      return post<FileUploadResponse>('/api/files', { data: b64, filename: file.name, mime: file.type })
+    } else {
+      // Server/desktop mode: multipart/form-data
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 120_000) // 2 min for uploads
+
+      try {
+        const response = await fetch(`${BASE_URL}/api/files`, {
+          method: 'POST',
+          body: formData,
+          signal: controller.signal,
+          // Note: do NOT set Content-Type — browser sets it with boundary
+        })
+        if (!response.ok) throw await ApiError.fromResponse(response)
+        return response.json() as Promise<FileUploadResponse>
+      } finally {
+        clearTimeout(timeoutId)
+      }
+    }
+  },
+
+  /**
+   * Get the URL for a file by hash. In WASM mode, fetches as base64 and returns an ObjectURL.
+   * In server/desktop mode, returns a direct URL.
+   */
+  url(hash: string, mime?: string): string {
+    const mimeParam = mime ? `?mime=${encodeURIComponent(mime)}` : ''
+    return `${BASE_URL}/api/files/${hash}${mimeParam}`
+  },
+
+  /**
+   * Download file bytes as a Blob.
+   */
+  async download(hash: string, mime?: string): Promise<Blob> {
+    if (isWasmMode()) {
+      // WASM mode: fetch as base64 JSON via format=json query param
+      const params = new URLSearchParams({ format: 'json' })
+      if (mime) params.set('mime', mime)
+      const resp = await wasmRequest('GET', `/api/files/${hash}?${params}`, '')
+      if (!resp.ok) throw await ApiError.fromResponse(resp)
+      const json = await resp.json()
+      const binary = atob(json.data)
+      const bytes = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) {
+        bytes[i] = binary.charCodeAt(i)
+      }
+      return new Blob([bytes], { type: json.mime || mime || 'application/octet-stream' })
+    } else {
+      const mimeParam = mime ? `?mime=${encodeURIComponent(mime)}` : ''
+      const resp = await fetch(`${BASE_URL}/api/files/${hash}${mimeParam}`)
+      if (!resp.ok) throw await ApiError.fromResponse(resp)
+      return resp.blob()
+    }
+  },
+
+  /** Check if a file exists by hash. */
+  async exists(hash: string): Promise<boolean> {
+    try {
+      if (isWasmMode()) {
+        const resp = await wasmRequest('GET', `/api/files/${hash}/check`, '')
+        return resp.ok
+      } else {
+        const resp = await fetch(`${BASE_URL}/api/files/${hash}/check`)
+        return resp.ok
+      }
+    } catch {
+      return false
+    }
+  },
 }
 
 // ============================================
@@ -359,9 +485,10 @@ export const api = {
   debug,
   importExport,
   resolve,
+  files,
 }
 
-export { blocks, atoms, edges, roots, schemas, graph, debug, importExport, resolve }
+export { blocks, atoms, edges, roots, schemas, graph, debug, importExport, resolve, files }
 
 // Expose API on window for e2e tests (dev mode only)
 if (import.meta.env.DEV) {

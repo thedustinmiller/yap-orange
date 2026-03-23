@@ -11,6 +11,7 @@ pub mod bootstrap;
 pub mod content;
 pub mod error;
 pub mod export;
+pub mod file_store;
 pub mod hash;
 pub mod links;
 pub mod models;

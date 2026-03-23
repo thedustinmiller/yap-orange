@@ -28,6 +28,7 @@
   import { getSetting } from './settingsStore.svelte';
   import { addToast } from './toastStore.svelte';
   import { clearCompletionCache } from './editor/completion';
+  import { handleFileDrop } from './fileDrop';
   import ContextMenu from './ContextMenu.svelte';
   import { actions as menuActions, type MenuContext } from './contextMenuActions';
 
@@ -52,7 +53,7 @@
   let isEditing = $derived(appState.editingBlockId === node.id);
 
   // System content types that don't use EntryView
-  const CONTENT_TYPES = new Set(['content', 'raw_text', '', 'setting', 'type_registry', 'schema']);
+  const CONTENT_TYPES = new Set(['content', 'raw_text', '', 'namespace', 'setting', 'type_registry', 'schema']);
 
   // Custom type view — loaded async, replaces BlockEditor/ContentRenderer pair
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -343,6 +344,10 @@
     },
     navigateTo: (id: string) => navigateTo(id),
     exportSubtree,
+    reloadTree: async () => {
+      await reloadCurrentTree();
+      await reloadAffectedParents([node.id]);
+    },
   };
 
   // --- Drag and Drop ---
@@ -361,7 +366,8 @@
   function handleDragOver(e: DragEvent) {
     e.preventDefault();
     if (!e.dataTransfer) return;
-    e.dataTransfer.dropEffect = 'move';
+    // External files get 'copy' indicator; internal blocks get 'move'
+    e.dataTransfer.dropEffect = e.dataTransfer.types.includes('Files') ? 'copy' : 'move';
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
     const y = (e.clientY - rect.top) / rect.height;
     dropZone = y < 0.25 ? 'above' : y > 0.75 ? 'below' : 'inside';
@@ -391,6 +397,31 @@
     dropZone = null;
     if (!e.dataTransfer || !zone) return;
 
+    // External file drop — dispatch by type
+    if (e.dataTransfer.files.length > 0) {
+      try {
+        const results = await handleFileDrop(
+          e.dataTransfer.files,
+          zone,
+          node,
+          computeDropPosition,
+        );
+        await reloadCurrentTree();
+        await reloadAffectedParents([zone === 'inside' ? node.id : (node.parent_id ?? '')].filter(Boolean));
+        if (zone === 'inside') getExpandedBlocks().add(node.id);
+
+        const mediaCount = results.filter(r => r.type === 'media').length;
+        const importCount = results.filter(r => r.type === 'import').length;
+        if (mediaCount) addToast(`Added ${mediaCount} file(s)`, 'success');
+        if (importCount) addToast(`Imported ${importCount} tree(s)`, 'success');
+      } catch (err) {
+        console.error('File drop failed:', err);
+        addToast('File drop failed', 'error');
+      }
+      return;
+    }
+
+    // Internal block reorder
     const raw = e.dataTransfer.getData('application/yap-block-ids');
     if (!raw) return;
     const draggedIds: string[] = JSON.parse(raw);

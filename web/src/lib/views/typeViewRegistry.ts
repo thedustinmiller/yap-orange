@@ -50,6 +50,21 @@ const VIEW_DEFINITIONS: Record<string, ViewDefinition> = {
     icon: '☑',
     label: 'Todo',
   },
+  image: {
+    load: () => import('./ImageView.svelte'),
+    icon: '🖼',
+    label: 'Image',
+  },
+  pdf: {
+    load: () => import('./PdfView.svelte'),
+    icon: '📄',
+    label: 'PDF',
+  },
+  file: {
+    load: () => import('./FileView.svelte'),
+    icon: '📎',
+    label: 'File',
+  },
 }
 
 // Cache: content_type → loaded Component

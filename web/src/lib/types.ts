@@ -86,6 +86,8 @@ export interface CreateBlockRequest {
   content_type?: string
   properties?: Properties
   position?: string
+  /** Direct parent block ID — if provided, namespace is ignored */
+  parent_id?: string
 }
 
 export interface CreateBlockResponse {

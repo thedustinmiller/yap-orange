@@ -6,24 +6,39 @@
  *
  * Wiki links ([[path]]) pass through the mdast parser as plain text,
  * then are post-processed into clickable spans.
+ * Embed links (![[path]]) become placeholder spans for async mounting.
  */
 import { fromMarkdown } from 'mdast-util-from-markdown'
 import { toHast } from 'mdast-util-to-hast'
 import { toHtml } from 'hast-util-to-html'
 
-const WIKI_LINK_RE = /\[\[([^\]]+)\]\]/g
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
 
 /**
- * Convert wiki link patterns in HTML to clickable spans.
- * Handles links both inside and outside of HTML tags.
+ * Regex that matches both embeds (![[...]]) and regular links ([[...]]).
+ * Embeds are matched first due to the optional ! prefix.
+ * Group 1: optional ! prefix
+ * Group 2: link path
  */
-function replaceWikiLinks(html: string): string {
-  return html.replace(WIKI_LINK_RE, (_match, path: string) => {
-    const escaped = path
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
+const LINK_RE = /(!?)\[\[([^\]]+)\]\]/g
+
+/**
+ * Replace wiki link and embed patterns in HTML with styled elements.
+ * - Regular links → clickable `<span class="wiki-link">` spans
+ * - Embeds → `<span class="block-embed">` placeholder spans (mounted by ContentRenderer)
+ */
+function replaceLinks(html: string): string {
+  return html.replace(LINK_RE, (_match, bang: string, path: string) => {
+    const escaped = escapeHtml(path)
+    if (bang === '!') {
+      return `<span class="block-embed" data-embed-path="${escaped}"></span>`
+    }
     return `<span class="wiki-link" data-path="${escaped}">${escaped}</span>`
   })
 }
@@ -33,7 +48,7 @@ function replaceWikiLinks(html: string): string {
  *
  * For plain text without markdown, this still works — it just wraps in <p> tags.
  * Wiki links become `<span class="wiki-link" data-path="...">` elements.
- * Type embeds become `<span class="type-embed-display" ...>` chip spans.
+ * Embed links become `<span class="block-embed" data-embed-path="...">` placeholders.
  */
 export function renderMarkdown(content: string): string {
   if (!content) return ''
@@ -42,8 +57,8 @@ export function renderMarkdown(content: string): string {
   const hast = toHast(mdast)
   let html = toHtml(hast!)
 
-  // Post-process: replace [[wiki links]] with styled spans
-  html = replaceWikiLinks(html)
+  // Post-process: replace [[wiki links]] and ![[embeds]] with styled spans
+  html = replaceLinks(html)
 
   return html
 }

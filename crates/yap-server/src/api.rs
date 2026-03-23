@@ -403,6 +403,7 @@ pub struct UpdateAtomRequest {
 #[derive(Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 pub struct CreateBlockRequest {
+    #[serde(default)]
     pub namespace: String,
     pub name: String,
     #[serde(default)]
@@ -414,6 +415,10 @@ pub struct CreateBlockRequest {
     pub properties: serde_json::Value,
     #[serde(default)]
     pub position: Option<String>,
+    /// Optional direct parent block ID. If provided, `namespace` is ignored
+    /// and the block is created directly under this parent.
+    #[serde(default)]
+    pub parent_id: Option<Uuid>,
 }
 
 fn default_content_type() -> String {
@@ -718,23 +723,30 @@ pub async fn create_block(
     State(state): State<AppState>,
     Json(request): Json<CreateBlockRequest>,
 ) -> Result<(StatusCode, Json<CreateBlockResponse>), ApiError> {
-    // Resolve the namespace to a parent_id
-    let parent_id = if request.namespace.is_empty() {
+    // Resolve parent: prefer parent_id if given, else resolve namespace
+    let parent_id = if let Some(pid) = request.parent_id {
+        Some(pid)
+    } else if request.namespace.is_empty() {
         None
     } else {
         // Ensure the namespace exists (mkdir -p behavior)
         Some(state.db.ensure_namespace_block(&request.namespace).await?)
     };
 
+    // Compute context namespace for link resolution
+    let context_ns = if let Some(pid) = parent_id {
+        Some(state.db.compute_namespace(pid).await?)
+    } else if !request.namespace.is_empty() {
+        Some(request.namespace.clone())
+    } else {
+        None
+    };
+
     // Serialize content to extract links
     let serialized = serialize_content(
         state.db.as_ref(),
         &request.content,
-        if request.namespace.is_empty() {
-            None
-        } else {
-            Some(&request.namespace)
-        },
+        context_ns.as_deref(),
     )
     .await?;
 
@@ -1548,6 +1560,164 @@ pub async fn import_at_root(
 }
 
 // =============================================================================
+// ZIP Export/Import (with media files) — gated behind zip-export feature
+// (lzma-sys can't compile to wasm32-unknown-unknown)
+// =============================================================================
+
+/// Export a subtree as a ZIP containing tree.json + blob files.
+///
+/// GET /api/blocks/{id}/export-zip
+pub async fn export_block_tree_zip(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(params): Query<ExportQueryParams>,
+) -> Result<Response, ApiError> {
+    use std::io::Write;
+
+    let options = ExportOptions {
+        include_keys: params
+            .include_keys
+            .map(|s| s.split(',').map(|k| k.trim().to_string()).collect()),
+    };
+    let tree = yap_core::export::export_tree(state.db.as_ref(), id, &options).await?;
+    let file_hashes = yap_core::export::collect_file_hashes(&tree);
+
+    let mut zip_buffer = Vec::new();
+    {
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut zip_buffer));
+        let zip_options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+
+        // Write tree.json
+        let tree_json = serde_json::to_vec_pretty(&tree)
+            .map_err(|e| ApiError::internal(format!("JSON serialize failed: {}", e)))?;
+        zip.start_file("tree.json", zip_options)
+            .map_err(|e| ApiError::internal(format!("ZIP error: {}", e)))?;
+        zip.write_all(&tree_json)
+            .map_err(|e| ApiError::internal(format!("ZIP write error: {}", e)))?;
+
+        // Write blob files
+        for hash in &file_hashes {
+            if let Some(data) = state.files.get_file(hash).await.map_err(ApiError::from)? {
+                zip.start_file(format!("files/{}", hash), zip_options)
+                    .map_err(|e| ApiError::internal(format!("ZIP error: {}", e)))?;
+                zip.write_all(&data)
+                    .map_err(|e| ApiError::internal(format!("ZIP write error: {}", e)))?;
+            }
+        }
+
+        zip.finish()
+            .map_err(|e| ApiError::internal(format!("ZIP finish error: {}", e)))?;
+    }
+
+    Ok((
+        [
+            (
+                axum::http::header::CONTENT_TYPE,
+                "application/zip".to_string(),
+            ),
+            (
+                axum::http::header::CONTENT_DISPOSITION,
+                "attachment; filename=\"export.zip\"".to_string(),
+            ),
+        ],
+        zip_buffer,
+    )
+        .into_response())
+}
+
+/// Core ZIP import logic shared by the two handler variants.
+async fn do_import_zip(
+    state: &AppState,
+    parent_id: Option<Uuid>,
+    params: &ImportQueryParams,
+    body_bytes: &[u8],
+) -> Result<ImportResult, ApiError> {
+    use std::io::Read;
+
+    // Extract all data from ZIP synchronously (no .await while borrowing zip)
+    let (tree, file_blobs) = {
+        let cursor = std::io::Cursor::new(body_bytes);
+        let mut zip = zip::ZipArchive::new(cursor)
+            .map_err(|e| ApiError::bad_request(format!("Invalid ZIP: {}", e)))?;
+
+        // Collect file blobs
+        let mut blobs: Vec<Vec<u8>> = Vec::new();
+        for i in 0..zip.len() {
+            let mut file = zip
+                .by_index(i)
+                .map_err(|e| ApiError::bad_request(format!("ZIP read error: {}", e)))?;
+            let name = file.name().to_string();
+            if name.starts_with("files/") && name.len() > 6 {
+                let mut data = Vec::new();
+                file.read_to_end(&mut data)
+                    .map_err(|e| ApiError::internal(format!("ZIP extract error: {}", e)))?;
+                blobs.push(data);
+            }
+        }
+
+        // Extract tree.json
+        let tree: ExportTree = {
+            let mut file = zip
+                .by_name("tree.json")
+                .map_err(|_| ApiError::bad_request("ZIP missing tree.json"))?;
+            let mut buf = Vec::new();
+            file.read_to_end(&mut buf)
+                .map_err(|e| ApiError::internal(format!("ZIP extract error: {}", e)))?;
+            serde_json::from_slice(&buf)
+                .map_err(|e| ApiError::bad_request(format!("Invalid tree.json: {}", e)))?
+        };
+
+        (tree, blobs)
+    };
+
+    // Now store blobs (async) — zip is dropped, no borrow issues
+    for data in &file_blobs {
+        state.files.put_file(data).await.map_err(ApiError::from)?;
+    }
+
+    let options = parse_import_options(params);
+    let result =
+        yap_core::export::import_tree(state.db.as_ref(), &tree, parent_id, options).await?;
+    Ok(result)
+}
+
+#[derive(Deserialize)]
+pub struct ZipImportRequest {
+    /// Base64-encoded ZIP data
+    pub data: String,
+}
+
+/// Import ZIP under a specific parent block.
+pub async fn import_zip_under_block(
+    State(state): State<AppState>,
+    Path(id): Path<Uuid>,
+    Query(params): Query<ImportQueryParams>,
+    Json(request): Json<ZipImportRequest>,
+) -> Result<(StatusCode, Json<ImportResult>), ApiError> {
+    use base64::Engine;
+    let body_bytes = base64::engine::general_purpose::STANDARD
+        .decode(&request.data)
+        .map_err(|e| ApiError::bad_request(format!("Invalid base64: {}", e)))?;
+    let result = do_import_zip(&state, Some(id), &params, &body_bytes).await?;
+    Ok((StatusCode::CREATED, Json(result)))
+}
+
+/// Import ZIP at root level.
+pub async fn import_zip_at_root(
+    State(state): State<AppState>,
+    Query(params): Query<ImportQueryParams>,
+    Json(request): Json<ZipImportRequest>,
+) -> Result<(StatusCode, Json<ImportResult>), ApiError> {
+    use base64::Engine;
+    let body_bytes = base64::engine::general_purpose::STANDARD
+        .decode(&request.data)
+        .map_err(|e| ApiError::bad_request(format!("Invalid base64: {}", e)))?;
+    let result = do_import_zip(&state, None, &params, &body_bytes).await?;
+    Ok((StatusCode::CREATED, Json(result)))
+}
+
+// =============================================================================
 // Schema Endpoints (Phase 6.1 - Custom Types)
 // =============================================================================
 
@@ -1721,6 +1891,190 @@ pub async fn get_debug_logs(
 ) -> Json<Vec<crate::log_buffer::LogEntry>> {
     let since = query.since.unwrap_or(0);
     Json(state.log_buffer.entries_since(since))
+}
+
+// =============================================================================
+// File Storage
+// =============================================================================
+
+/// Response for file upload
+#[derive(Serialize)]
+pub struct FileUploadResponse {
+    pub hash: String,
+    pub size: usize,
+}
+
+/// Upload a file via multipart form or JSON base64.
+///
+/// Accepts either:
+/// - `multipart/form-data` with a `file` field (standard HTTP upload)
+/// - `application/json` with `{ "data": "<base64>", "filename": "...", "mime": "..." }` (WASM mode)
+pub async fn upload_file(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    body: axum::body::Body,
+) -> Result<Json<FileUploadResponse>, ApiError> {
+    use axum::body::Bytes;
+    use http_body_util::BodyExt;
+
+    let content_type = headers
+        .get("content-type")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    let file_data: Vec<u8> = if content_type.starts_with("multipart/form-data") {
+        // Multipart upload — extract the first file field
+        let boundary = content_type
+            .split("boundary=")
+            .nth(1)
+            .ok_or_else(|| ApiError::bad_request("Missing multipart boundary"))?
+            .to_string();
+
+        let body_bytes: Bytes = body
+            .collect()
+            .await
+            .map_err(|e| ApiError::internal(format!("Failed to read body: {}", e)))?
+            .to_bytes();
+
+        let mut multipart = multer::Multipart::new(
+            futures_util::stream::once(async move { Ok::<_, std::io::Error>(body_bytes) }),
+            boundary,
+        );
+
+        let field = multipart
+            .next_field()
+            .await
+            .map_err(|e| ApiError::bad_request(format!("Invalid multipart: {}", e)))?
+            .ok_or_else(|| ApiError::bad_request("No file field in multipart body"))?;
+
+        field
+            .bytes()
+            .await
+            .map_err(|e| ApiError::bad_request(format!("Failed to read field: {}", e)))?
+            .to_vec()
+    } else if content_type.starts_with("application/json") {
+        // JSON upload with base64 data (WASM mode)
+        #[derive(Deserialize)]
+        struct JsonUpload {
+            data: String, // base64-encoded
+        }
+
+        let body_bytes: Bytes = body
+            .collect()
+            .await
+            .map_err(|e| ApiError::internal(format!("Failed to read body: {}", e)))?
+            .to_bytes();
+
+        let upload: JsonUpload = serde_json::from_slice(&body_bytes)
+            .map_err(|e| ApiError::bad_request(format!("Invalid JSON: {}", e)))?;
+
+        use base64::Engine;
+        base64::engine::general_purpose::STANDARD
+            .decode(&upload.data)
+            .map_err(|e| ApiError::bad_request(format!("Invalid base64: {}", e)))?
+    } else {
+        return Err(ApiError::bad_request(
+            "Expected Content-Type: multipart/form-data or application/json",
+        ));
+    };
+
+    // Enforce size limit (50 MB)
+    const MAX_FILE_SIZE: usize = 50 * 1024 * 1024;
+    if file_data.len() > MAX_FILE_SIZE {
+        return Err(ApiError::bad_request(format!(
+            "File too large ({} bytes, max {} bytes)",
+            file_data.len(),
+            MAX_FILE_SIZE
+        )));
+    }
+
+    let size = file_data.len();
+    let hash = state
+        .files
+        .put_file(&file_data)
+        .await
+        .map_err(ApiError::from)?;
+
+    Ok(Json(FileUploadResponse { hash, size }))
+}
+
+/// Download a file by its content hash.
+pub async fn download_file(
+    State(state): State<AppState>,
+    Path(hash): Path<String>,
+    headers: axum::http::HeaderMap,
+    Query(query): Query<FileDownloadQuery>,
+) -> Result<Response, ApiError> {
+    let data = state
+        .files
+        .get_file(&hash)
+        .await
+        .map_err(ApiError::from)?
+        .ok_or_else(|| ApiError::not_found(format!("File not found: {}", hash)))?;
+
+    let accept = headers
+        .get("accept")
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("");
+
+    // WASM mode: return base64 JSON when Accept: application/json or ?format=json
+    let wants_json = accept.contains("application/json")
+        || query.format.as_deref() == Some("json");
+    if wants_json {
+        use base64::Engine;
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&data);
+        let mime = query.mime.as_deref().unwrap_or("application/octet-stream");
+        let json = serde_json::json!({
+            "data": b64,
+            "mime": mime,
+            "size": data.len(),
+        });
+        return Ok(Json(json).into_response());
+    }
+
+    // Standard binary response
+    let mime = query
+        .mime
+        .as_deref()
+        .unwrap_or("application/octet-stream")
+        .to_string();
+
+    Ok((
+        [
+            (axum::http::header::CONTENT_TYPE, mime),
+            (
+                axum::http::header::CONTENT_DISPOSITION,
+                "inline".to_string(),
+            ),
+        ],
+        data,
+    )
+        .into_response())
+}
+
+#[derive(Deserialize)]
+pub struct FileDownloadQuery {
+    pub mime: Option<String>,
+    /// Set to "json" to get base64-encoded response (used by WASM mode)
+    pub format: Option<String>,
+}
+
+/// Check if a file exists by its content hash.
+pub async fn check_file(
+    State(state): State<AppState>,
+    Path(hash): Path<String>,
+) -> Result<StatusCode, ApiError> {
+    let exists = state
+        .files
+        .file_exists(&hash)
+        .await
+        .map_err(ApiError::from)?;
+
+    if exists {
+        Ok(StatusCode::OK)
+    } else {
+        Ok(StatusCode::NOT_FOUND)
+    }
 }
 
 // =============================================================================

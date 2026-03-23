@@ -26,7 +26,7 @@ yap-store-pg = { path = "../yap-store-pg", optional = true }
 yap-store-sqlite = { path = "../yap-store-sqlite", optional = true }
 yap-bench = { path = "../yap-bench", optional = true }
 tokio = { workspace = true, optional = true }
-axum = { version = "0.8", default-features = false, features = ["json", "query"] }
+axum = { version = "0.8", default-features = false, features = ["json", "query", "multipart"] }
 tower = { version = "0.5", default-features = false }
 tower-http = { workspace = true, optional = true }
 uuid.workspace = true
@@ -37,6 +37,11 @@ thiserror.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
+base64 = "0.22"
+multer = "3"
+futures-util = "0.3"
+http-body-util = "0.1"
+zip.workspace = true
 utoipa = { workspace = true, optional = true }
 utoipa-swagger-ui = { workspace = true, optional = true }
 
@@ -48,6 +53,8 @@ serde_json.workspace = true
 uuid.workspace = true
 http = "1"
 http-body-util = "0.1"
+base64 = "0.22"
+tempfile = "3"
 yap-store-sqlite = { path = "../yap-store-sqlite" }
 yap-core = { path = "../yap-core" }
 sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite"] }

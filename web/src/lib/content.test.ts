@@ -26,6 +26,7 @@ describe('parseLinks', () => {
       start: 4,
       end: 16,
       resolved: true,
+      isEmbed: false,
     })
   })
 
@@ -92,6 +93,46 @@ describe('parseLinks', () => {
 })
 
 // ============================================
+// Embed link parsing
+// ============================================
+describe('parseLinks - embeds', () => {
+  it('parses embed link with isEmbed=true', () => {
+    const result = parseLinks('![[foo::bar]]')
+    expect(result).toHaveLength(1)
+    expect(result[0].isEmbed).toBe(true)
+    expect(result[0].path).toBe('foo::bar')
+    expect(result[0].raw).toBe('![[foo::bar]]')
+    expect(result[0].start).toBe(0)
+    expect(result[0].end).toBe(13)
+  })
+
+  it('parses regular link with isEmbed=false', () => {
+    const result = parseLinks('[[foo]]')
+    expect(result).toHaveLength(1)
+    expect(result[0].isEmbed).toBe(false)
+  })
+
+  it('parses mixed links and embeds', () => {
+    const result = parseLinks('link [[a]] embed ![[b]] link [[c]]')
+    expect(result).toHaveLength(3)
+    expect(result[0].isEmbed).toBe(false)
+    expect(result[0].path).toBe('a')
+    expect(result[1].isEmbed).toBe(true)
+    expect(result[1].path).toBe('b')
+    expect(result[2].isEmbed).toBe(false)
+    expect(result[2].path).toBe('c')
+  })
+
+  it('embed in middle of text has correct start/end', () => {
+    const result = parseLinks('hello ![[img]] world')
+    expect(result).toHaveLength(1)
+    expect(result[0].start).toBe(6)
+    expect(result[0].end).toBe(14)
+    expect(result[0].isEmbed).toBe(true)
+  })
+})
+
+// ============================================
 // segmentContent
 // ============================================
 describe('segmentContent', () => {
@@ -144,6 +185,22 @@ describe('segmentContent', () => {
     expect(result[0]).toEqual({ type: 'text', value: 'bar ' })
     expect(result[1].type).toBe('link')
     expect(result[1].value).toBe('foo')
+  })
+
+  it('returns embed segment for ![[...]]', () => {
+    const result = segmentContent('see ![[img]]')
+    expect(result).toHaveLength(2)
+    expect(result[0]).toEqual({ type: 'text', value: 'see ' })
+    expect(result[1].type).toBe('embed')
+    expect(result[1].value).toBe('img')
+  })
+
+  it('handles mixed links and embeds', () => {
+    const result = segmentContent('[[a]] then ![[b]]')
+    expect(result).toHaveLength(3)
+    expect(result[0].type).toBe('link')
+    expect(result[1]).toEqual({ type: 'text', value: ' then ' })
+    expect(result[2].type).toBe('embed')
   })
 })
 

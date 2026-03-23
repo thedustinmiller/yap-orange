@@ -31,4 +31,6 @@ utoipa = { workspace = true, optional = true }
 
 [dev-dependencies]
 tokio-test.workspace = true
+tokio = { workspace = true, features = ["full"] }
 proptest = "1"
+tempfile = "3"

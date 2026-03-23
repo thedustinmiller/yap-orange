@@ -38,7 +38,12 @@ async fn test_app() -> Router {
     let db: Arc<dyn Store> = Arc::new(SqliteStore::new(pool));
     let log_buffer = LogBuffer::new(100);
 
-    let state = AppState { db, log_buffer };
+    let dir = tempfile::tempdir().expect("create temp dir");
+    let files: Arc<dyn yap_core::file_store::FileStore> = Arc::new(
+        yap_core::file_store::FsFileStore::new(dir.path().join("files")).expect("create file store"),
+    );
+
+    let state = AppState { db, log_buffer, files };
     build_router(state)
 }
 

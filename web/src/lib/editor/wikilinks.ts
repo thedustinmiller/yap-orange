@@ -1,10 +1,13 @@
 /**
- * CM6 ViewPlugin for cursor-aware wiki link decorations.
+ * CM6 ViewPlugin for cursor-aware wiki link and embed decorations.
  *
  * When the cursor is AWAY from a [[link]], renders a styled clickable span
  * (Obsidian-style live preview — brackets hidden, just the path).
  *
- * When the cursor is INSIDE a [[link]], shows the raw [[path]] text with
+ * When the cursor is AWAY from a ![[embed]], renders a compact embed chip
+ * showing the path with an embed icon.
+ *
+ * When the cursor is INSIDE either, shows the raw text with
  * a colored mark decoration so the user can edit the path directly.
  */
 import {
@@ -18,7 +21,8 @@ import {
 import { RangeSetBuilder } from '@codemirror/state'
 import type { Extension } from '@codemirror/state'
 
-const LINK_RE = /\[\[([^\]]+)\]\]/g
+/** Matches both ![[embed]] and [[link]] patterns. Group 1: optional !, Group 2: path */
+const LINK_RE = /(!?)\[\[([^\]]+)\]\]/g
 
 class WikiLinkWidget extends WidgetType {
   constructor(
@@ -50,6 +54,36 @@ class WikiLinkWidget extends WidgetType {
   }
 }
 
+class EmbedWidget extends WidgetType {
+  constructor(
+    readonly path: string,
+    readonly onNavigate: (path: string) => void,
+  ) {
+    super()
+  }
+
+  toDOM(): HTMLElement {
+    const span = document.createElement('span')
+    span.className = 'cm-embed-widget'
+    span.textContent = this.path
+    span.title = `Embedded: ${this.path}`
+    span.addEventListener('click', (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      this.onNavigate(this.path)
+    })
+    return span
+  }
+
+  eq(other: EmbedWidget): boolean {
+    return this.path === other.path
+  }
+
+  ignoreEvent(): boolean {
+    return false
+  }
+}
+
 /** Mark decoration for when cursor is inside the link — colors the raw text */
 const linkMark = Decoration.mark({ class: 'cm-wiki-link-editing' })
 
@@ -69,9 +103,10 @@ function buildDecorations(
     LINK_RE.lastIndex = 0
 
     while ((match = LINK_RE.exec(line.text)) !== null) {
+      const isEmbed = match[1] === '!'
       const from = line.from + match.index
       const to = from + match[0].length
-      const path = match[1]
+      const path = match[2]
 
       // Check if any cursor overlaps this link range
       const cursorInside = cursors.some(
@@ -81,8 +116,17 @@ function buildDecorations(
       if (cursorInside) {
         // Cursor inside: show raw text with mark styling
         builder.add(from, to, linkMark)
+      } else if (isEmbed) {
+        // Cursor away from embed: show embed widget
+        builder.add(
+          from,
+          to,
+          Decoration.replace({
+            widget: new EmbedWidget(path, onNavigate),
+          }),
+        )
       } else {
-        // Cursor away: replace with styled widget
+        // Cursor away from link: show link widget
         builder.add(
           from,
           to,
@@ -98,9 +142,9 @@ function buildDecorations(
 }
 
 /**
- * Returns a CM6 extension that provides cursor-aware wiki link decorations.
+ * Returns a CM6 extension that provides cursor-aware wiki link and embed decorations.
  *
- * @param onNavigate - Called when user clicks a wiki link widget
+ * @param onNavigate - Called when user clicks a wiki link or embed widget
  */
 export function wikiLinks(onNavigate: (path: string) => void): Extension {
   return ViewPlugin.define(

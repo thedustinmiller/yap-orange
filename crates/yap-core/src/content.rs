@@ -20,7 +20,7 @@
 use uuid::Uuid;
 
 use crate::error::Result;
-use crate::links::{format_link, parse_links};
+use crate::links::{format_embed_link, format_link, parse_links};
 use crate::store::Store;
 
 /// Result of serializing editor content for storage
@@ -73,7 +73,11 @@ pub async fn serialize_content(
         match resolved {
             Some(lineage_id) => {
                 let placeholder_idx = links.len();
-                template.push_str(&format!("{{{}}}", placeholder_idx));
+                if link.is_embed {
+                    template.push_str(&format!("!{{{}}}", placeholder_idx));
+                } else {
+                    template.push_str(&format!("{{{}}}", placeholder_idx));
+                }
                 links.push(lineage_id);
             }
             None => {
@@ -96,7 +100,8 @@ pub async fn serialize_content(
 
 /// Deserialize storage format back to editor view.
 ///
-/// Replaces `{N}` placeholders with `[[wiki::link]]` syntax using
+/// Replaces `{N}` placeholders with `[[wiki::link]]` syntax and
+/// `!{N}` placeholders with `![[wiki::link]]` embed syntax, using
 /// the canonical path for each lineage. Broken links render as `[[?]]`.
 pub async fn deserialize_content(db: &dyn Store, template: &str, links: &[Uuid]) -> Result<String> {
     if links.is_empty() {
@@ -107,17 +112,27 @@ pub async fn deserialize_content(db: &dyn Store, template: &str, links: &[Uuid])
 
     // Process in reverse order so earlier placeholder indices stay valid.
     for (idx, lineage_id) in links.iter().enumerate().rev() {
-        let placeholder = format!("{{{}}}", idx);
         let info = db.get_link_display_info(*lineage_id).await?;
+        let segments: Option<Vec<&str>> = info
+            .as_ref()
+            .map(|i| i.namespace.split("::").collect());
 
-        let link_text = match info {
-            Some(info) => {
-                let segments: Vec<&str> = info.namespace.split("::").collect();
-                format_link(&segments)
-            }
+        // Replace embed placeholder !{N} first (before {N}, since {N} is a substring of !{N})
+        let embed_placeholder = format!("!{{{}}}", idx);
+        if result.contains(&embed_placeholder) {
+            let link_text = match &segments {
+                Some(segs) => format_embed_link(segs),
+                None => "![[?]]".to_string(),
+            };
+            result = result.replace(&embed_placeholder, &link_text);
+        }
+
+        // Replace regular placeholder {N}
+        let placeholder = format!("{{{}}}", idx);
+        let link_text = match &segments {
+            Some(segs) => format_link(segs),
             None => "[[?]]".to_string(),
         };
-
         result = result.replace(&placeholder, &link_text);
     }
 
@@ -134,10 +149,12 @@ pub fn serialize_content_sync(content: &str) -> SerializedContent {
     }
 }
 
-/// Sync version of deserialize — replaces placeholders with `[[?]]`.
+/// Sync version of deserialize — replaces placeholders with `[[?]]` and `![[?]]`.
 pub fn deserialize_content_sync(template: &str, links: &[Uuid]) -> String {
     let mut result = template.to_string();
     for (idx, _) in links.iter().enumerate().rev() {
+        // Replace embed placeholders first (before regular, since {N} is a substring of !{N})
+        result = result.replace(&format!("!{{{}}}", idx), "![[?]]");
         result = result.replace(&format!("{{{}}}", idx), "[[?]]");
     }
     result

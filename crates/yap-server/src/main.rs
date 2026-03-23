@@ -6,6 +6,7 @@ use std::sync::Arc;
 use tokio::signal;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use yap_core::export::ExportTree;
+use yap_core::file_store::FsFileStore;
 use yap_core::seed::{default_seed_trees, parse_seed_json};
 use yap_server::{AppState, BufferLayer, LogBuffer, build_router};
 
@@ -29,7 +30,19 @@ async fn main() -> anyhow::Result<()> {
         tracing::warn!("Bootstrap failed: {}", e);
     }
 
-    let state = AppState { db, log_buffer };
+    // File store: use FILES_DIR env var or default to ./files/
+    let files_dir = std::env::var("FILES_DIR")
+        .unwrap_or_else(|_| "files".to_string());
+    let files = Arc::new(
+        FsFileStore::new(std::path::PathBuf::from(files_dir))
+            .expect("Failed to create file store"),
+    );
+
+    let state = AppState {
+        db,
+        log_buffer,
+        files,
+    };
     let app = build_router(state);
 
     let host = std::env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string());

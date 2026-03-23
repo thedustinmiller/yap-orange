@@ -6,7 +6,7 @@
  * Represents a parsed link in content
  */
 export interface ParsedLink {
-  /** Full match including brackets: [[path::to::block]] */
+  /** Full match including brackets: [[path::to::block]] or ![[path::to::block]] */
   raw: string
   /** Path without brackets: path::to::block */
   path: string
@@ -16,15 +16,19 @@ export interface ParsedLink {
   end: number
   /** Whether link target exists */
   resolved: boolean
+  /** Whether this is an embed (![[...]]) rather than a regular link ([[...]]) */
+  isEmbed: boolean
 }
 
 /**
- * Regex for matching wiki links: [[...]]
+ * Regex for matching wiki links and embeds: [[...]] and ![[...]]
+ * Group 1: optional ! prefix
+ * Group 2: link path
  */
-const LINK_REGEX = /\[\[([^\]]+)\]\]/g
+const LINK_REGEX = /(!?)\[\[([^\]]+)\]\]/g
 
 /**
- * Parse wiki links from content
+ * Parse wiki links and embeds from content
  */
 export function parseLinks(content: string): ParsedLink[] {
   LINK_REGEX.lastIndex = 0
@@ -34,10 +38,11 @@ export function parseLinks(content: string): ParsedLink[] {
   while ((match = LINK_REGEX.exec(content)) !== null) {
     links.push({
       raw: match[0],
-      path: match[1],
+      path: match[2],
       start: match.index,
       end: match.index + match[0].length,
       resolved: true,
+      isEmbed: match[1] === '!',
     })
   }
 
@@ -45,17 +50,17 @@ export function parseLinks(content: string): ParsedLink[] {
 }
 
 /**
- * A segment of content — either plain text or a wiki link
+ * A segment of content — either plain text, a wiki link, or an embed
  */
 export interface ContentSegment {
-  type: 'text' | 'link'
+  type: 'text' | 'link' | 'embed'
   value: string
   link?: ParsedLink
 }
 
 /**
  * Split content into segments for safe rendering.
- * Alternates between text and link segments.
+ * Alternates between text, link, and embed segments.
  */
 export function segmentContent(content: string): ContentSegment[] {
   const links = parseLinks(content)
@@ -72,7 +77,7 @@ export function segmentContent(content: string): ContentSegment[] {
     }
 
     segments.push({
-      type: 'link',
+      type: link.isEmbed ? 'embed' : 'link',
       value: link.path,
       link,
     })

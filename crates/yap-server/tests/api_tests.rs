@@ -8,6 +8,8 @@
 use std::sync::Arc;
 
 use axum::Router;
+#[allow(unused_imports)]
+use base64::Engine;
 use http::StatusCode;
 use http_body_util::BodyExt;
 use serde_json::{Value, json};
@@ -37,7 +39,12 @@ async fn test_app() -> Router {
     let db: Arc<dyn Store> = Arc::new(SqliteStore::new(pool));
     let log_buffer = LogBuffer::new(100);
 
-    let state = AppState { db, log_buffer };
+    let dir = tempfile::tempdir().expect("create temp dir");
+    let files: Arc<dyn yap_core::file_store::FileStore> = Arc::new(
+        yap_core::file_store::FsFileStore::new(dir.path().join("files")).expect("create file store"),
+    );
+
+    let state = AppState { db, log_buffer, files };
     build_router(state)
 }
 
@@ -1861,4 +1868,375 @@ async fn test_resolve_schema_deleted() {
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
     assert!(body["error"].is_string());
+}
+
+// =============================================================================
+// File Storage API
+// =============================================================================
+
+/// Send a raw bytes request (for file upload/download tests).
+async fn raw_request(
+    app: &Router,
+    method: http::Method,
+    uri: &str,
+    content_type: &str,
+    body: Vec<u8>,
+) -> (StatusCode, Vec<u8>) {
+    let request = http::Request::builder()
+        .method(method)
+        .uri(uri)
+        .header("content-type", content_type)
+        .body(axum::body::Body::from(body))
+        .unwrap();
+
+    let response = app.clone().oneshot(request).await.unwrap();
+    let status = response.status();
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes().to_vec();
+    (status, body_bytes)
+}
+
+#[tokio::test]
+async fn test_upload_file_json_base64() {
+    let app = test_app().await;
+    let data = b"hello world";
+    let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, data);
+
+    let (status, body) = json_request(
+        &app,
+        http::Method::POST,
+        "/api/files",
+        Some(json!({ "data": b64, "filename": "test.txt", "mime": "text/plain" })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "upload failed: {:?}", body);
+    assert!(body["hash"].is_string());
+    assert_eq!(body["size"], 11);
+
+    let hash = body["hash"].as_str().unwrap();
+    // SHA-256 of "hello world"
+    assert_eq!(hash, "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
+}
+
+#[tokio::test]
+async fn test_upload_file_multipart() {
+    let app = test_app().await;
+    let boundary = "----TestBoundary123";
+    let file_data = b"PNG image data here";
+    let multipart_body = format!(
+        "------TestBoundary123\r\n\
+         Content-Disposition: form-data; name=\"file\"; filename=\"test.png\"\r\n\
+         Content-Type: image/png\r\n\
+         \r\n"
+    );
+    let mut body_bytes = multipart_body.into_bytes();
+    body_bytes.extend_from_slice(file_data);
+    body_bytes.extend_from_slice(b"\r\n------TestBoundary123--\r\n");
+
+    let (status, resp_bytes) = raw_request(
+        &app,
+        http::Method::POST,
+        "/api/files",
+        &format!("multipart/form-data; boundary={}", boundary),
+        body_bytes,
+    )
+    .await;
+
+    let body: Value = serde_json::from_slice(&resp_bytes).unwrap();
+    assert_eq!(status, StatusCode::OK, "multipart upload failed: {:?}", body);
+    assert!(body["hash"].is_string());
+    assert_eq!(body["size"], file_data.len());
+}
+
+#[tokio::test]
+async fn test_download_file() {
+    let app = test_app().await;
+
+    // Upload first
+    let data = b"test file content for download";
+    let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, data);
+    let (status, upload_body) = json_request(
+        &app,
+        http::Method::POST,
+        "/api/files",
+        Some(json!({ "data": b64 })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let hash = upload_body["hash"].as_str().unwrap();
+
+    // Download as binary
+    let request = http::Request::builder()
+        .method(http::Method::GET)
+        .uri(format!("/api/files/{}?mime=text/plain", hash))
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    let ct = response.headers().get("content-type").unwrap().to_str().unwrap();
+    assert_eq!(ct, "text/plain");
+
+    let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
+    assert_eq!(body_bytes.as_ref(), data);
+}
+
+#[tokio::test]
+async fn test_download_file_json_format() {
+    let app = test_app().await;
+
+    // Upload
+    let data = b"json format test";
+    let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, data);
+    let (_, upload_body) = json_request(
+        &app,
+        http::Method::POST,
+        "/api/files",
+        Some(json!({ "data": b64 })),
+    )
+    .await;
+    let hash = upload_body["hash"].as_str().unwrap();
+
+    // Download as JSON (WASM mode path)
+    let (status, body) = json_request(
+        &app,
+        http::Method::GET,
+        &format!("/api/files/{}?format=json&mime=text/plain", hash),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["mime"], "text/plain");
+    assert_eq!(body["size"], data.len());
+
+    // Verify base64 round-trips
+    let decoded = base64::Engine::decode(
+        &base64::engine::general_purpose::STANDARD,
+        body["data"].as_str().unwrap(),
+    )
+    .unwrap();
+    assert_eq!(decoded, data);
+}
+
+#[tokio::test]
+async fn test_download_file_not_found() {
+    let app = test_app().await;
+    let (status, body) = json_request(
+        &app,
+        http::Method::GET,
+        "/api/files/0000000000000000000000000000000000000000000000000000000000000000?format=json",
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    assert!(body["error"].as_str().unwrap().contains("not found"));
+}
+
+#[tokio::test]
+async fn test_check_file_exists() {
+    let app = test_app().await;
+
+    // Upload a file
+    let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, b"check test");
+    let (_, upload_body) = json_request(
+        &app,
+        http::Method::POST,
+        "/api/files",
+        Some(json!({ "data": b64 })),
+    )
+    .await;
+    let hash = upload_body["hash"].as_str().unwrap();
+
+    // Check exists
+    let request = http::Request::builder()
+        .method(http::Method::GET)
+        .uri(format!("/api/files/{}/check", hash))
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+
+    // Check non-existent
+    let request = http::Request::builder()
+        .method(http::Method::GET)
+        .uri("/api/files/nonexistenthash/check")
+        .body(axum::body::Body::empty())
+        .unwrap();
+    let response = app.clone().oneshot(request).await.unwrap();
+    assert_eq!(response.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn test_upload_file_dedup() {
+    let app = test_app().await;
+
+    let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, b"dedup content");
+
+    // Upload same content twice
+    let (_, body1) = json_request(
+        &app,
+        http::Method::POST,
+        "/api/files",
+        Some(json!({ "data": b64.clone() })),
+    )
+    .await;
+    let (_, body2) = json_request(
+        &app,
+        http::Method::POST,
+        "/api/files",
+        Some(json!({ "data": b64 })),
+    )
+    .await;
+
+    // Same hash returned
+    assert_eq!(body1["hash"], body2["hash"]);
+}
+
+#[tokio::test]
+async fn test_upload_file_size_limit() {
+    let app = test_app().await;
+
+    // Create data larger than 50MB limit
+    let big_data = vec![0u8; 50 * 1024 * 1024 + 1];
+    let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, &big_data);
+
+    let (status, body) = json_request(
+        &app,
+        http::Method::POST,
+        "/api/files",
+        Some(json!({ "data": b64 })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert!(body["error"].as_str().unwrap().contains("too large"));
+}
+
+// =============================================================================
+// Media Block Creation (parent_id)
+// =============================================================================
+
+#[tokio::test]
+async fn test_create_block_with_parent_id() {
+    let app = test_app().await;
+
+    // Create a parent block
+    let (parent_id, _) = create_test_block(&app, "", "parent", "", "content").await;
+
+    // Create a child using parent_id instead of namespace
+    let (status, body) = json_request(
+        &app,
+        http::Method::POST,
+        "/api/blocks",
+        Some(json!({
+            "namespace": "",
+            "name": "child-via-id",
+            "content": "",
+            "parent_id": parent_id.to_string(),
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "create failed: {:?}", body);
+
+    // Verify the child is under the parent
+    let child_id: Uuid = body["block_id"].as_str().unwrap().parse().unwrap();
+    let (status, child) = json_request(
+        &app,
+        http::Method::GET,
+        &format!("/api/blocks/{}", child_id),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(child["parent_id"].as_str().unwrap(), parent_id.to_string());
+    assert_eq!(child["namespace"], "parent::child-via-id");
+}
+
+#[tokio::test]
+async fn test_create_media_block_with_parent_id() {
+    let app = test_app().await;
+
+    // Upload a file first
+    let b64 = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, b"fake png data");
+    let (_, upload_body) = json_request(
+        &app,
+        http::Method::POST,
+        "/api/files",
+        Some(json!({ "data": b64 })),
+    )
+    .await;
+    let file_hash = upload_body["hash"].as_str().unwrap();
+
+    // Create a parent
+    let (parent_id, _) = create_test_block(&app, "", "media-parent", "", "content").await;
+
+    // Create an image block using parent_id
+    let (status, body) = json_request(
+        &app,
+        http::Method::POST,
+        "/api/blocks",
+        Some(json!({
+            "namespace": "",
+            "name": "screenshot",
+            "content": "",
+            "content_type": "image",
+            "parent_id": parent_id.to_string(),
+            "properties": {
+                "file_hash": file_hash,
+                "filename": "screenshot.png",
+                "mime": "image/png",
+                "size": 13,
+            },
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED, "create image block failed: {:?}", body);
+
+    // Verify the block
+    let block_id: Uuid = body["block_id"].as_str().unwrap().parse().unwrap();
+    let (status, block) = json_request(
+        &app,
+        http::Method::GET,
+        &format!("/api/blocks/{}", block_id),
+        None,
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(block["content_type"], "image");
+    assert_eq!(block["properties"]["file_hash"], file_hash);
+    assert_eq!(block["properties"]["filename"], "screenshot.png");
+    assert_eq!(block["properties"]["mime"], "image/png");
+}
+
+#[tokio::test]
+async fn test_create_block_parent_id_overrides_namespace() {
+    let app = test_app().await;
+
+    // Create two separate parent blocks
+    let (parent_a, _) = create_test_block(&app, "", "parent-a", "", "content").await;
+    let (_parent_b, _) = create_test_block(&app, "", "parent-b", "", "content").await;
+
+    // Create child with parent_id pointing to parent-a, but namespace saying parent-b
+    let (status, body) = json_request(
+        &app,
+        http::Method::POST,
+        "/api/blocks",
+        Some(json!({
+            "namespace": "parent-b",
+            "name": "child",
+            "content": "",
+            "parent_id": parent_a.to_string(),
+        })),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CREATED);
+
+    // Should be under parent-a (parent_id wins)
+    let child_id: Uuid = body["block_id"].as_str().unwrap().parse().unwrap();
+    let (_, child) = json_request(
+        &app,
+        http::Method::GET,
+        &format!("/api/blocks/{}", child_id),
+        None,
+    )
+    .await;
+    assert_eq!(child["namespace"], "parent-a::child");
 }

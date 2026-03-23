@@ -213,9 +213,14 @@ async fn seed_and_serve(
         tracing::warn!("Bootstrap failed: {e}");
     }
 
+    // File store: content-addressed files under the data directory
+    let files_dir = data_dir()?.join("files");
+    let files = Arc::new(yap_core::file_store::FsFileStore::new(files_dir)?);
+
     let state = AppState {
         db: store,
         log_buffer,
+        files,
     };
     let router = build_router(state);
 

@@ -21,7 +21,7 @@
 /// Parsed link from content
 #[derive(Debug, Clone, PartialEq)]
 pub struct ParsedLink {
-    /// The full original text including brackets: `[[foo::bar]]`
+    /// The full original text including brackets: `[[foo::bar]]` or `![[foo::bar]]`
     pub original: String,
     /// The path segments: `["foo", "bar"]`
     pub segments: Vec<String>,
@@ -29,6 +29,8 @@ pub struct ParsedLink {
     pub is_relative: bool,
     /// Number of parent levels to traverse (0 for absolute, 1 for ./, 2 for ../, etc.)
     pub parent_levels: usize,
+    /// Whether this is an embed (`![[...]]`) rather than a regular link (`[[...]]`)
+    pub is_embed: bool,
     /// Start position in the original content
     pub start: usize,
     /// End position in the original content
@@ -80,6 +82,7 @@ pub fn parse_links(content: &str) -> Vec<ParsedLink> {
     let mut current_segment = String::new();
     let mut segments: Vec<String> = Vec::new();
     let mut first_segment_quoted = false;
+    let mut is_embed = false;
 
     let chars: Vec<char> = content.chars().collect();
     let mut i = 0;
@@ -91,7 +94,9 @@ pub fn parse_links(content: &str) -> Vec<ParsedLink> {
             ParseState::LookingForOpen => {
                 if c == '[' {
                     state = ParseState::FoundFirstBracket;
-                    link_start = i;
+                    // Check if preceded by ! for embed syntax
+                    is_embed = i > 0 && chars[i - 1] == '!';
+                    link_start = if is_embed { i - 1 } else { i };
                 }
             }
 
@@ -183,6 +188,7 @@ pub fn parse_links(content: &str) -> Vec<ParsedLink> {
                             segments: final_segments,
                             is_relative,
                             parent_levels,
+                            is_embed,
                             start: link_start,
                             end: link_end,
                         });
@@ -191,6 +197,7 @@ pub fn parse_links(content: &str) -> Vec<ParsedLink> {
                     segments.clear();
                     current_segment.clear();
                     first_segment_quoted = false;
+                    is_embed = false;
                     state = ParseState::LookingForOpen;
                 } else {
                     // Single ] - part of content (unusual but handle it)
@@ -428,6 +435,13 @@ pub fn format_link(segments: &[impl AsRef<str>]) -> String {
         .collect();
 
     format!("[[{}]]", formatted_segments.join("::"))
+}
+
+/// Format segments into an embed link string: `![[foo::bar]]`.
+///
+/// Same as [`format_link`] but with the `!` embed prefix.
+pub fn format_embed_link(segments: &[impl AsRef<str>]) -> String {
+    format!("!{}", format_link(segments))
 }
 
 #[cfg(test)]
@@ -782,6 +796,80 @@ mod tests {
         let parsed = parse_links(&result);
         assert_eq!(parsed.len(), 1);
         assert_eq!(parsed[0].segments, vec!["foo", "back\\slash"]);
+    }
+
+    // =========================================================================
+    // Embed link tests (![[...]])
+    // =========================================================================
+
+    #[test]
+    fn test_parse_embed_link() {
+        let content = "Check this: ![[foo::bar]]";
+        let links = parse_links(content);
+        assert_eq!(links.len(), 1);
+        assert_eq!(links[0].original, "![[foo::bar]]");
+        assert_eq!(links[0].segments, vec!["foo", "bar"]);
+        assert!(links[0].is_embed);
+        assert_eq!(links[0].start, 12); // includes the !
+        assert_eq!(links[0].end, 25);
+    }
+
+    #[test]
+    fn test_parse_regular_link_not_embed() {
+        let content = "See [[foo::bar]]";
+        let links = parse_links(content);
+        assert_eq!(links.len(), 1);
+        assert!(!links[0].is_embed);
+    }
+
+    #[test]
+    fn test_parse_mixed_links_and_embeds() {
+        let content = "Link: [[a]] and embed: ![[b]] and link: [[c]]";
+        let links = parse_links(content);
+        assert_eq!(links.len(), 3);
+        assert!(!links[0].is_embed);
+        assert_eq!(links[0].segments, vec!["a"]);
+        assert!(links[1].is_embed);
+        assert_eq!(links[1].segments, vec!["b"]);
+        assert!(!links[2].is_embed);
+        assert_eq!(links[2].segments, vec!["c"]);
+    }
+
+    #[test]
+    fn test_parse_embed_at_start() {
+        let content = "![[image::photo]]";
+        let links = parse_links(content);
+        assert_eq!(links.len(), 1);
+        assert!(links[0].is_embed);
+        assert_eq!(links[0].start, 0);
+        assert_eq!(links[0].end, 17);
+        assert_eq!(links[0].original, "![[image::photo]]");
+    }
+
+    #[test]
+    fn test_parse_embed_relative() {
+        let content = "![[./child]]";
+        let links = parse_links(content);
+        assert_eq!(links.len(), 1);
+        assert!(links[0].is_embed);
+        assert!(links[0].is_relative);
+        assert_eq!(links[0].segments, vec!["child"]);
+    }
+
+    #[test]
+    fn test_format_embed_link() {
+        assert_eq!(format_embed_link(&["foo", "bar"]), "![[foo::bar]]");
+        assert_eq!(format_embed_link(&["single"]), "![[single]]");
+    }
+
+    #[test]
+    fn test_embed_roundtrip() {
+        let original = "![[foo::bar]]";
+        let links = parse_links(original);
+        assert_eq!(links.len(), 1);
+        assert!(links[0].is_embed);
+        let formatted = format_embed_link(&links[0].segments);
+        assert_eq!(formatted, original);
     }
 }
 
