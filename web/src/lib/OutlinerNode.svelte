@@ -412,8 +412,8 @@
 
         const mediaCount = results.filter(r => r.type === 'media').length;
         const importCount = results.filter(r => r.type === 'import').length;
-        if (mediaCount) addToast(`Added ${mediaCount} file(s)`, 'success');
-        if (importCount) addToast(`Imported ${importCount} tree(s)`, 'success');
+        if (mediaCount) addToast(`Added ${mediaCount} file(s)`, 'info');
+        if (importCount) addToast(`Imported ${importCount} tree(s)`, 'info');
       } catch (err) {
         console.error('File drop failed:', err);
         addToast('File drop failed', 'error');

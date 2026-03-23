@@ -113,9 +113,7 @@ pub async fn deserialize_content(db: &dyn Store, template: &str, links: &[Uuid])
     // Process in reverse order so earlier placeholder indices stay valid.
     for (idx, lineage_id) in links.iter().enumerate().rev() {
         let info = db.get_link_display_info(*lineage_id).await?;
-        let segments: Option<Vec<&str>> = info
-            .as_ref()
-            .map(|i| i.namespace.split("::").collect());
+        let segments: Option<Vec<&str>> = info.as_ref().map(|i| i.namespace.split("::").collect());
 
         // Replace embed placeholder !{N} first (before {N}, since {N} is a substring of !{N})
         let embed_placeholder = format!("!{{{}}}", idx);

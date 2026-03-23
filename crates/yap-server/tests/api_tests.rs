@@ -41,10 +41,15 @@ async fn test_app() -> Router {
 
     let dir = tempfile::tempdir().expect("create temp dir");
     let files: Arc<dyn yap_core::file_store::FileStore> = Arc::new(
-        yap_core::file_store::FsFileStore::new(dir.path().join("files")).expect("create file store"),
+        yap_core::file_store::FsFileStore::new(dir.path().join("files"))
+            .expect("create file store"),
     );
 
-    let state = AppState { db, log_buffer, files };
+    let state = AppState {
+        db,
+        log_buffer,
+        files,
+    };
     build_router(state)
 }
 
@@ -1891,7 +1896,13 @@ async fn raw_request(
 
     let response = app.clone().oneshot(request).await.unwrap();
     let status = response.status();
-    let body_bytes = response.into_body().collect().await.unwrap().to_bytes().to_vec();
+    let body_bytes = response
+        .into_body()
+        .collect()
+        .await
+        .unwrap()
+        .to_bytes()
+        .to_vec();
     (status, body_bytes)
 }
 
@@ -1914,7 +1925,10 @@ async fn test_upload_file_json_base64() {
 
     let hash = body["hash"].as_str().unwrap();
     // SHA-256 of "hello world"
-    assert_eq!(hash, "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9");
+    assert_eq!(
+        hash,
+        "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9"
+    );
 }
 
 #[tokio::test]
@@ -1942,7 +1956,12 @@ async fn test_upload_file_multipart() {
     .await;
 
     let body: Value = serde_json::from_slice(&resp_bytes).unwrap();
-    assert_eq!(status, StatusCode::OK, "multipart upload failed: {:?}", body);
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "multipart upload failed: {:?}",
+        body
+    );
     assert!(body["hash"].is_string());
     assert_eq!(body["size"], file_data.len());
 }
@@ -1973,7 +1992,12 @@ async fn test_download_file() {
     let response = app.clone().oneshot(request).await.unwrap();
     assert_eq!(response.status(), StatusCode::OK);
 
-    let ct = response.headers().get("content-type").unwrap().to_str().unwrap();
+    let ct = response
+        .headers()
+        .get("content-type")
+        .unwrap()
+        .to_str()
+        .unwrap();
     assert_eq!(ct, "text/plain");
 
     let body_bytes = response.into_body().collect().await.unwrap().to_bytes();
@@ -2188,7 +2212,12 @@ async fn test_create_media_block_with_parent_id() {
         })),
     )
     .await;
-    assert_eq!(status, StatusCode::CREATED, "create image block failed: {:?}", body);
+    assert_eq!(
+        status,
+        StatusCode::CREATED,
+        "create image block failed: {:?}",
+        body
+    );
 
     // Verify the block
     let block_id: Uuid = body["block_id"].as_str().unwrap().parse().unwrap();

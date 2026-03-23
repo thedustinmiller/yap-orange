@@ -94,7 +94,11 @@ impl FileStore for FsFileStore {
         // Write atomically: write to temp file then rename
         let tmp_path = path.with_extension("tmp");
         std::fs::write(&tmp_path, data).map_err(|e| {
-            crate::error::Error::Internal(format!("Failed to write file {}: {}", tmp_path.display(), e))
+            crate::error::Error::Internal(format!(
+                "Failed to write file {}: {}",
+                tmp_path.display(),
+                e
+            ))
         })?;
         std::fs::rename(&tmp_path, &path).map_err(|e| {
             // Clean up temp file on rename failure

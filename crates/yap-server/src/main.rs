@@ -31,11 +31,9 @@ async fn main() -> anyhow::Result<()> {
     }
 
     // File store: use FILES_DIR env var or default to ./files/
-    let files_dir = std::env::var("FILES_DIR")
-        .unwrap_or_else(|_| "files".to_string());
+    let files_dir = std::env::var("FILES_DIR").unwrap_or_else(|_| "files".to_string());
     let files = Arc::new(
-        FsFileStore::new(std::path::PathBuf::from(files_dir))
-            .expect("Failed to create file store"),
+        FsFileStore::new(std::path::PathBuf::from(files_dir)).expect("Failed to create file store"),
     );
 
     let state = AppState {

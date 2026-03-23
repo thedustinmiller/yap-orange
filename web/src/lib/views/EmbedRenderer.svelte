@@ -15,14 +15,14 @@
     onNavigateLink?: (path: string) => void;
   } = $props();
 
-  let state: 'loading' | 'loaded' | 'error' | 'depth-exceeded' = $state('loading');
+  let loadState: 'loading' | 'loaded' | 'error' | 'depth-exceeded' = $state('loading');
   let block: any = $state(null);
   let errorMessage = $state('');
   let mediaUrl = $state<string | null>(null);
 
   onMount(async () => {
     if (depth >= maxDepth) {
-      state = 'depth-exceeded';
+      loadState = 'depth-exceeded';
       return;
     }
 
@@ -39,20 +39,20 @@
         );
       }
 
-      state = 'loaded';
+      loadState = 'loaded';
     } catch {
-      state = 'error';
+      loadState = 'error';
       errorMessage = path;
     }
   });
 </script>
 
 <span class="embed-container" role="presentation">
-  {#if state === 'loading'}
+  {#if loadState === 'loading'}
     <span class="embed-loading">...</span>
-  {:else if state === 'depth-exceeded'}
+  {:else if loadState === 'depth-exceeded'}
     <span class="embed-depth-exceeded" title="Max embed depth reached">[[{path}]]</span>
-  {:else if state === 'error'}
+  {:else if loadState === 'error'}
     <span class="embed-error">embed not found: {errorMessage}</span>
   {:else if block}
     {#if block.content_type === 'image' && mediaUrl}

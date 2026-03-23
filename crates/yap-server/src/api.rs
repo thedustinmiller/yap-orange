@@ -743,12 +743,8 @@ pub async fn create_block(
     };
 
     // Serialize content to extract links
-    let serialized = serialize_content(
-        state.db.as_ref(),
-        &request.content,
-        context_ns.as_deref(),
-    )
-    .await?;
+    let serialized =
+        serialize_content(state.db.as_ref(), &request.content, context_ns.as_deref()).await?;
 
     // Create the block with its atom
     let (block, _atom) = state
@@ -2018,8 +2014,7 @@ pub async fn download_file(
         .unwrap_or("");
 
     // WASM mode: return base64 JSON when Accept: application/json or ?format=json
-    let wants_json = accept.contains("application/json")
-        || query.format.as_deref() == Some("json");
+    let wants_json = accept.contains("application/json") || query.format.as_deref() == Some("json");
     if wants_json {
         use base64::Engine;
         let b64 = base64::engine::general_purpose::STANDARD.encode(&data);

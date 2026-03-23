@@ -40,10 +40,15 @@ async fn test_app() -> Router {
 
     let dir = tempfile::tempdir().expect("create temp dir");
     let files: Arc<dyn yap_core::file_store::FileStore> = Arc::new(
-        yap_core::file_store::FsFileStore::new(dir.path().join("files")).expect("create file store"),
+        yap_core::file_store::FsFileStore::new(dir.path().join("files"))
+            .expect("create file store"),
     );
 
-    let state = AppState { db, log_buffer, files };
+    let state = AppState {
+        db,
+        log_buffer,
+        files,
+    };
     build_router(state)
 }
 
