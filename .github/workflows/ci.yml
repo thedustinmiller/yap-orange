@@ -200,7 +200,7 @@ jobs:
         run: npx playwright test
 
   deploy-pages:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/prod'
     needs: [e2e-tests]
     runs-on: ubuntu-latest
     permissions:
